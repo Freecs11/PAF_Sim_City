@@ -1,4 +1,4 @@
-name:                minijeu
+name:                SimCity
 version:             0.1.0.0
 github:              "githubuser/minijeu"
 license:             BSD3
@@ -38,7 +38,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - minijeu
+    - SimCity
 
 tests:
   minijeu-test:
@@ -49,4 +49,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - minijeu
+    - SimCity

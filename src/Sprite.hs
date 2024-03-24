@@ -1,5 +1,5 @@
 module Sprite where
-
+import SDL (Renderer, Texture, Rectangle(..), createTextureFromSurface, copy, destroyTexture)
 import Control.Monad.IO.Class (MonadIO)
 
 import Foreign.C.Types (CInt)
@@ -9,8 +9,16 @@ import qualified Data.Sequence as Seq
 
 import SDL.Vect (V2 (..), Point (..))
 
-import SDL.Video.Renderer (Renderer, Texture, Rectangle (..))
+import SDL.Video.Renderer (Renderer, Texture, Rectangle )
 import qualified SDL.Video.Renderer as R
+
+import Data.Text (Text)
+
+import Data.Word (Word8)
+
+import qualified SDL 
+import SDL (V4(..), Point(..), Rectangle(..))
+import qualified SDL.Font as Font
 
 import TextureMap (TextureMap, TextureId)
 import qualified TextureMap as TM
@@ -90,4 +98,15 @@ displaySprite rdr tmap sp@(Sprite imgs cur dest) =
     (Image tid src) -> do
       let txt = TM.fetchTexture tid tmap
       R.copy rdr txt Nothing (Just dest)
+      
+-- | affichage d'un texte sur le `renderer` SDL2
+displayText :: Renderer -> Font.Font -> Text -> V2 CInt -> V4 Word8 -> IO ()
+displayText rdr font txt pos color = do
+  surface <- Font.solid font color txt
+  texture <- createTextureFromSurface rdr surface
+  surfaceSize <- R.surfaceDimensions surface
+  let destRect = Rectangle (P pos) surfaceSize
+  copy rdr texture Nothing (Just destRect)
+  destroyTexture texture
+  SDL.freeSurface surface
 

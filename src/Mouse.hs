@@ -51,3 +51,6 @@ mouseButtonPressed mouse events =
                               _ -> False
   in any buttonPressed events 
 
+getMousePosition :: MouseState -> (Int, Int)
+getMousePosition (P (V2 x y)) = (x, y)
+

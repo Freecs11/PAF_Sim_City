@@ -20,6 +20,7 @@ import Linear (V4(..), V2(..))
 import SDL.Time (time, delay)
 import TextureMap (TextureMap, TextureId (..))
 import qualified TextureMap as TM
+import Control.Monad (foldM)
 
 import Sprite (Sprite)
 import qualified Sprite as S
@@ -38,6 +39,9 @@ import Data.Text (pack)
 import Model (GameState)
 import qualified Model as M
 
+import qualified GameData as GameData
+import GameData (Coord (..), Batiment (..), ZonId (..), BatId (..), CitId (..) , Citoyen (..), Zone (..), Ville (..))
+import qualified Batiments as Bat
 
 -- TO BE MODIFIED --------------------------------------------------------------
 
@@ -48,6 +52,7 @@ loadBackground rdr path tmap smap = do
   let smap' = SM.addSprite (SpriteId "grass") sprite smap
   return (tmap', smap')
 
+-- | Load the perso sprite
 loadPerso :: Renderer-> FilePath -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
 loadPerso rdr path tmap smap = do
   tmap' <- TM.loadTexture rdr path (TextureId "perso") tmap
@@ -56,19 +61,66 @@ loadPerso rdr path tmap smap = do
   return (tmap', smap')
 
 
--- a simcity menu is a list of buttons ( different batiments to build with different costs)
--- for now we will just display a list with the names of the buildings and their costs ()
--- don't use sprites for now , just text with the name of the building and its cost , i need the menu to be displayed on the right side of the screen
--- the menu will be interactive , when the player clicks on a building , the building will be selected and the player can place it on the map
+-- loadBackground :: Renderer-> FilePath -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
+-- loadBackground rdr path tmap smap = do
+--   tmap' <- TM.loadTexture rdr path (TextureId "grass") tmap
+--   let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage (TextureId "grass") (S.mkArea 0 0 640 480)
+--   let smap' = SM.addSprite (SpriteId "grass") sprite smap
+--   return (tmap', smap')
+
+-- | Load the batiment sprite
+loadBatimentT :: Renderer -> TextureMap -> (TextureId, FilePath) -> IO TextureMap
+loadBatimentT rdr tmap (tid, path) = do
+  tmap' <- TM.loadTexture rdr path tid tmap
+  return tmap'
+
+-- | Load the batiment sprite
+loadBatimentS :: Renderer -> TextureMap -> (TextureId, FilePath) -> SpriteMap -> IO SpriteMap
+loadBatimentS rdr tmap (tid, path) smap = do
+  tmap' <- TM.loadTexture rdr path tid tmap
+  let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage tid (S.mkArea 0 0 100 100)
+  let smap' = SM.addSprite (SpriteId $ show tid) sprite smap
+  return smap'
+
+display :: Renderer -> TextureMap -> SpriteMap -> String -> [Coord]  -> IO ()
+display _ _ _ _ [] = return ()
+display rdr tmap smap spriteId (c:cs) = do
+  S.displaySprite rdr tmap (SM.fetchSprite (SpriteId spriteId) smap)
+  display rdr tmap smap spriteId cs
+
+-- | Display the buildings on the screen
+displayBuildings :: Renderer -> TextureMap -> SpriteMap -> [Batiment] -> IO ()
+displayBuildings rdr tmap smap buildings = do
+  foldM (\_ building -> do
+    buildingSprite <-  Bat.fetchBuildingSprite building tmap
+    S.displaySprite rdr tmap buildingSprite) () buildings
+  return ()
+
+
+  
+-- | Display the zones on the screen
+displayZones :: Renderer -> TextureMap -> SpriteMap -> Map.Map ZonId Zone -> IO ()
+displayZones rdr tmap smap zones = do
+  return ()
+-- | Display the citizens on the screen
+displayCitizens :: Renderer -> TextureMap -> SpriteMap -> Map.Map CitId Citoyen -> IO ()
+displayCitizens rdr tmap smap citizens = do
+  return ()
+
+-- | Display the state of the game
+displayGameState :: Renderer -> TextureMap -> SpriteMap -> GameState -> IO ()
+displayGameState rdr tmap smap (M.GameState city coins _) = do
+  -- Display the buildings
+  displayBuildings rdr tmap smap (Map.elems $ Bat.getBatiments city)
 
 
 menu :: IO (Map.Map String (Int, Int, Int))
-menu = return $ Map.fromList [("house", (100, 500, 80)), 
-                              ("factory", (200, 500, 95)), 
-                              ("hospital", (300, 500, 110)), 
-                              ("commercial", (400, 500, 125)), 
-                              ("road", (50, 500, 140)), 
-                              ("railway", (100, 500, 155))]
+menu = return $ Map.fromList [("Cabane", (100, 500, 80)), 
+                              ("Epicerie", (200, 500, 95)), 
+                              ("Police", (300, 500, 110)), 
+                              ("Commissariat", (400, 500, 125)), 
+                              ("Road", (50, 500, 140)), 
+                              ("Railway", (100, 500, 155))]
 
 renderMenuItems :: Renderer -> Font.Font -> Map.Map String (Int, Int, Int) -> IO ()
 renderMenuItems renderer font menuItems = do
@@ -76,6 +128,43 @@ renderMenuItems renderer font menuItems = do
   Map.traverseWithKey (\name (cost, x, y) -> 
     S.displayText renderer font (pack $ name ++ " : " ++ show cost) (V2 (fromIntegral x) (fromIntegral y)) (V4 255 255 255 255)) menuItems
   return ()
+
+
+-- check if the mouse is over a menu item
+isMouseOverMenuItem :: (Int, Int) -> (Int, Int, Int) -> Bool
+isMouseOverMenuItem (x, y) (x', y', w) = x > x' && x < x' + w && y > y' && y < y' + 20
+
+
+displaySelectedBuilding :: Renderer -> Batiment -> TextureMap -> SpriteMap -> String -> MouseState -> [Event] -> [Batiment] -> IO [Batiment]
+displaySelectedBuilding rdr batiment tmap smap selectedBuilding mouse events buildingsInMap = do
+  if Ms.mouseButtonPressed mouse events 
+    then do
+      let (x, y) = Ms.getMousePosition mouse  
+      buildingSprite <-  Bat.fetchBuildingSprite batiment tmap --
+      let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage (getTextureId buildingSprite) (S.mkArea (fromIntegral x) (fromIntegral y) 100 100)  -- Create the sprite at the mouse position , NOT WORKING
+      let spriteId = SpriteId selectedBuilding 
+      let smap' = SM.addSprite spriteId sprite smap 
+      return $ batiment : buildingsInMap
+    else return buildingsInMap
+
+
+
+
+-- | Get the texture id of a sprite
+getTextureId :: Sprite -> TextureId
+getTextureId sprite = case S.currentImage sprite of
+  S.Image tid _ -> tid
+
+
+getSelectedBuilding :: TextureMap -> SpriteMap -> String -> Batiment 
+getSelectedBuilding tmap smap selectedBuilding = 
+  case selectedBuilding of
+    "Cabane" -> Cabane (GameData.Rectangle (C 0 0) 100 100) (C 0 0) 100 []
+    "Atelier" -> Atelier (GameData.Rectangle (C 0 0) 100 100) (C 0 0) 100 []
+    "Epicerie" -> Epicerie (GameData.Rectangle (C 0 0) 100 100) (C 0 0) 100 []
+    "Commissariat" -> Commissariat (GameData.Rectangle (C 0 0) 100 100) (C 0 0)
+    _ -> Cabane (GameData.Rectangle (C 0 0) 100 100) (C 0 0) 100 []
+
 
 
 
@@ -89,6 +178,17 @@ main = do
   (tmap, smap) <- loadBackground renderer "assets/grass.bmp" TM.createTextureMap SM.createSpriteMap
   -- chargement du personnage
   (tmap', smap') <- loadPerso renderer "assets/perso.bmp" tmap smap
+
+  -- liste d'éléments (Texture ID, FilePath) à charger
+  let buildings = [ (TextureId "Cabane", "assets/residuel.bmp"),
+                    (TextureId "Atelier", "assets/atelier.bmp"),
+                    (TextureId "Epicerie", "assets/epicerie.bmp"),
+                    (TextureId "Commissariat", "assets/police.bmp") ]
+  -- chargement des batiments dans la texture map et la sprite map 
+  tmap'' <- foldM (\tm (tid, path) -> loadBatimentT renderer tm (tid, path)) tmap' buildings
+  smap'' <- foldM (\sm (tid, path) -> loadBatimentS renderer tmap'' (tid, path) sm) smap' buildings
+
+
   -- initialisation de l'état du jeu
   let gameState = M.initGameState
   -- initialisation de l'état du clavier
@@ -98,6 +198,8 @@ main = do
   -- batiment par défaut sélectionné
   let selectedBuilding = "house"  -- type String
 
+
+
   -- Load menu items
   menuItems <- menu
 
@@ -105,10 +207,10 @@ main = do
   font <- Font.load "assets/Nexa-Heavy.ttf" 15
 
   -- lancement de la gameLoop
-  gameLoop 60 renderer tmap' smap' kbd gameState mouse font menuItems selectedBuilding
+  gameLoop 60 renderer tmap'' smap'' kbd gameState mouse font menuItems selectedBuilding []
 
-gameLoop :: (RealFrac a, Show a) => a -> Renderer -> TextureMap -> SpriteMap -> Keyboard -> GameState -> MouseState -> Font.Font -> Map.Map String (Int, Int, Int) -> String -> IO ()
-gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems selectedBuilding = do
+gameLoop :: (RealFrac a, Show a) => a -> Renderer -> TextureMap -> SpriteMap -> Keyboard -> GameState -> MouseState -> Font.Font -> Map.Map String (Int, Int, Int) -> String -> [Batiment] -> IO ()
+gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems selectedBuilding batiments = do
   startTime <- time
   events <- pollEvents
   let kbd' = K.handleEvents events kbd
@@ -116,19 +218,19 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems selecte
   clear renderer
   
   S.displaySprite renderer tmap (SM.fetchSprite (SpriteId "grass") smap)
-  --- display perso 
-  S.displaySprite renderer tmap (S.moveTo (SM.fetchSprite (SpriteId "perso") smap)
-                                 (fromIntegral (M.persoX gameState))
-                                 (fromIntegral (M.persoY gameState)))
-                                 
+
+   -- display the state of the game
+  displayGameState renderer tmap smap gameState
+
   -- display the selected building on the screen top left
   S.displayText renderer font ("Selected building: " <> pack selectedBuilding) (V2 3 5) (V4 255 255 255 255)
 
-  -- -- display a text in middle of the screen in black color
-  -- S.displayText renderer font "Sim City" (V2 250 200) (V4 0 0 0 255)
-
   -- display menu
   renderMenuItems renderer font menuItems
+
+  -- display selected building
+  let selectedBuilding' = getSelectedBuilding tmap smap selectedBuilding
+  displaySelectedBuilding renderer selectedBuilding' tmap smap selectedBuilding mouse' events batiments 
 
   ---
   present renderer
@@ -146,6 +248,7 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems selecte
   -- on execute l'IO pour obtenir les valeurs
   (updatedMenuItems, currentSelectedBuilding) <- updatedMenuItemsIOcall
 
+
   -- updatedMenuItems <- updatedMenuItems
   -- currentSelectedBuilding <- currentSelectedBuilding
 
@@ -153,9 +256,9 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems selecte
 
 
   --- update du game state
-  let gameState' = M.gameStep gameState kbd' deltaTime
+  let gameState' = M.GameState (M.city gameState) (M.coins gameState) currentSelectedBuilding
   ---
-  unless (K.keypressed KeycodeEscape kbd') (gameLoop frameRate renderer tmap smap kbd' gameState' mouse' font updatedMenuItems currentSelectedBuilding)
+  unless (K.keypressed KeycodeEscape kbd') (gameLoop frameRate renderer tmap smap kbd' gameState' mouse' font updatedMenuItems currentSelectedBuilding batiments)
 
 
 updateMenuItems :: Map.Map String (Int, Int, Int) -> String -> MouseState -> [Event] -> IO ( (Map.Map String (Int, Int, Int), String) )
@@ -173,3 +276,5 @@ updateMenuItems menuItems selectedBuilding mouseEvent events = do
                     return (Map.update (\(c, x'', y'') -> Just (c - 1, x'', y'')) itemName menuItems , itemName)
                 else return (menuItems, selectedBuilding) -- aucun batiment n'a été cliqué
         else return (menuItems, selectedBuilding) -- aucun bouton de la souris n'a été pressé
+
+

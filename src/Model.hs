@@ -6,45 +6,26 @@ import SDL
 import Keyboard (Keyboard)
 import qualified Keyboard as K
 
+import qualified Data.Map as Map
+
+import qualified GameData as GameData
+import GameData (Ville (..), Batiment (..), Coord (..), Forme (..), ZonId (..), BatId (..), CitId (..))
+
+
 -- A supprimer 
+data GameState = GameState {
+    city :: Ville,
+    coins :: Int,
+    currentBuilding :: String
+} deriving (Show, Eq)
 
-data GameState = GameState { persoX :: Int
-                           , persoY :: Int
-                           , speed :: Int }
-  deriving (Show)
-
-
+-- Initialize the game state
 initGameState :: GameState
-initGameState = GameState 200 300 4
-
-moveLeft :: GameState -> GameState
-moveLeft (GameState x y s) = GameState (x - s) y s
-
-moveRight :: GameState -> GameState
-moveRight (GameState x y s) = GameState (x + s) y s
-                              
-moveUp :: GameState -> GameState
-moveUp (GameState x y s) = GameState x (y - s) s
-
-moveDown :: GameState -> GameState
-moveDown (GameState x y s) = GameState x (y + s) s
-
-gameStep :: RealFrac a => GameState -> Keyboard -> a -> GameState
-gameStep gstate kbd deltaTime =
-  let modif = (if K.keypressed KeycodeLeft kbd
-               then moveLeft else id)
-              .
-              (if K.keypressed KeycodeRight kbd
-               then moveRight else id)
-              .
-              (if K.keypressed KeycodeUp kbd
-               then moveUp else id)
-              .
-              (if K.keypressed KeycodeDown kbd
-               then moveDown else id)
-
-  in modif gstate
+initGameState = GameState {
+    city = Ville { viZones = Map.empty, viCit = Map.empty },
+    coins = 1000,
+    currentBuilding = "cabane"
+  }
 
 
-  -- les évenement de la souris sont traités dans le main ( je n'ai pas eu le temps de les mettre ici , puisque c'est des IO() ) 
-  
+-- Update the game state

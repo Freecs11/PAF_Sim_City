@@ -1,5 +1,13 @@
 module Citoyens where
 
-import Formes
+import GameData
 
--- citoyens ( ER1 )
+
+
+
+-- preconditions and invariants to do
+
+
+
+-- SDL specific functions to draw citizens and their states
+

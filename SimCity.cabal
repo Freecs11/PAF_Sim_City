@@ -28,6 +28,7 @@ library
       Batiments
       Citoyens
       Formes
+      GameData
       Keyboard
       Model
       Mouse
@@ -35,7 +36,6 @@ library
       SpriteMap
       State
       TextureMap
-      Zones
   other-modules:
       Paths_SimCity
   hs-source-dirs:

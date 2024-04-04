@@ -172,7 +172,7 @@ main :: IO ()
 main = do
   initializeAll
   Font.initialize
-  window <- createWindow "Sim City" $ defaultWindow { windowInitialSize = V2 640 480 }
+  window <- createWindow "Sim City" $ defaultWindow { windowInitialSize = V2 1280 680 }
   renderer <- createRenderer window (-1) defaultRenderer
   -- chargement de l'image du fond
   (tmap, smap) <- loadBackground renderer "assets/grass.bmp" TM.createTextureMap SM.createSpriteMap

@@ -12,17 +12,13 @@ import qualified Data.Map as Map
 
 data Etat =  Etat {
         ville :: Ville,
-        coins :: Int
+        coins :: Int,
+        carte :: Map Coord (BatId, CitId)
     }
     deriving (Show, Eq)
 
-
--- | initial state of the game
--- initEtat :: Etat
--- initEtat = Etat initVille 1000
-
--- -- | update the state of the game
--- updateEtat :: Etat -> Etat
--- updateEtat (Etat v c) = Etat (updateVille v) c
+-- invariant test on Etat
+prop_carte_inv :: Etat -> Bool
+prop_carte_inv etat  
 
 

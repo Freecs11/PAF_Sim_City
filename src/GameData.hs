@@ -26,13 +26,13 @@ newtype BatId = BatId Int
 newtype CitId = CitId String
 
 instance Show ZonId where
-    show (ZonId i) = show i
+    show (ZonId i) = show "Zone " ++ show i
 
 instance Show BatId where
-    show (BatId i) = show i
+    show (BatId i) = show "Batiment " ++ show i
 
 instance Show CitId where
-    show (CitId i) = show i
+    show (CitId i) = show "Citoyen " ++ i
 
 instance Eq ZonId where
     (ZonId i) == (ZonId j) = i == j

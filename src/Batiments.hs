@@ -20,54 +20,6 @@ import qualified Debug.Trace as T
 import qualified Data.Map as Map
 import Data.Map (Map)
 
-
-
--- batiments functions and invariants/pre/post conditions
-
-
-
--- SDL specific functions to draw buildings and their states 
-
--- | draw a building
-
--- Import necessary modules
-
-
--- Function to create a sprite for a given building type
-createBuildingSprite :: Batiment -> TextureMap -> IO Sprite
-createBuildingSprite building textureMap = do
-    -- Determine the texture id based on the building type
-    let textureId = case building of
-            Cabane _ _ _ _ -> TextureId "Cabane"
-            Atelier _ _ _ _ -> TextureId "Atelier"
-            Epicerie _ _ _ _ -> TextureId "Epicerie"
-            Commissariat _ _ -> TextureId "Commissariat"
-    -- Fetch the texture based on the texture id from the texture map
-    -- debug
-    putStrLn $ "Fetching texture: " ++ show textureId
-    let texture = fetchTexture textureId textureMap
-    let defaultPosition = mkArea 0 0 0 0 -- to Modify position
-    let image = createImage textureId defaultPosition
-    let sprite = createEmptySprite `addImage` image
-    return sprite
-
--- | get the sprite of a building
-fetchBuildingSprite :: Batiment -> TextureMap -> IO Sprite
-fetchBuildingSprite building textureMap = 
-    case building of
-    Cabane _ _ _ _ -> fetchTextureSprite (TextureId "Cabane") textureMap
-    Atelier _ _ _ _ -> fetchTextureSprite (TextureId "Atelier") textureMap
-    Epicerie _ _ _ _ -> fetchTextureSprite (TextureId "Epicerie") textureMap
-    Commissariat _ _ -> fetchTextureSprite (TextureId "Commissariat") textureMap
-
--- | get the sprite of a building
-fetchTextureSprite :: TextureId -> TextureMap -> IO Sprite
-fetchTextureSprite tid tmap = let texture = fetchTexture tid tmap
-                                  defaultPosition = mkArea 0 0 0 0
-                                  image = createImage tid defaultPosition
-                              in 
-                               return(createEmptySprite `addImage` image )
-
 -- get the map of buildings from a city
 getBatiments :: Ville -> Map BatId Batiment
 getBatiments Ville { viZones = zones } = Map.fromList $ concatMap getBatimentsFromZone $ Map.toList zones
@@ -81,12 +33,50 @@ getBatiments Ville { viZones = zones } = Map.fromList $ concatMap getBatimentsFr
 
 
 
-    
+-- check if a building is at a coordinate
+isBatimentAt :: Coord -> BatId -> Etat -> Bool
+isBatimentAt coord batId (Etat {ville = ville}) = let batiments = getBatiments ville
+    in case Map.lookup batId batiments of
+        Just batiment -> case batiment of
+            Cabane forme coord' _ _ -> coord == coord'
+            Atelier forme coord' _ _ -> coord == coord'
+            Epicerie forme coord' _ _ -> coord == coord'
+            Commissariat forme coord' -> coord == coord'
+        Nothing -> False
 
+-- verify if the Coord and BatId of the state are coherent
+-- meaning that the building at the coord in Carte has the same batId
+-- as the one in the state
+prop_carte_coords_valid_Ville :: Etat -> Bool
+prop_carte_coords_valid_Ville etat@(Etat {ville = ville, carte = carte}) = Map.foldrWithKey step True carte
+    where
+        step :: Coord -> (BatId, CitId) -> Bool -> Bool
+        step coord (batId, _) acc = acc && isBatimentAt coord batId etat
+        
+-- check if map has a building at a coordinate
+hasBatimentAt :: BatId -> Etat -> Bool
+hasBatimentAt batId etat@(Etat {ville = ville , carte =c }) = let batiments = getBatiments ville
+    in case Map.lookup batId batiments of
+        Just bat -> case bat of
+            Cabane _ coord _ _ -> lookUpCarteWithBatID coord etat batId
+            Atelier _ coord _ _ -> lookUpCarteWithBatID coord etat batId
+            Epicerie _ coord _ _ -> lookUpCarteWithBatID coord etat batId
+            Commissariat _ coord -> lookUpCarteWithBatID coord etat batId
+        Nothing -> False
 
+-- lookup if the building at a coordinate in the carte match the batId 
+lookUpCarteWithBatID :: Coord -> Etat -> BatId -> Bool
+lookUpCarteWithBatID coord (Etat {carte = carte}) batId = case Map.lookup coord carte of
+    Just (batId', _) -> batId == batId'
+    Nothing -> False
 
-
-
-
+-- verify if all the buildings have coherent coords with the carte of the state
+-- meaning that the carte has the same batId as the building at the same coord
+prop_carteCoordBat_inv :: Etat -> Bool
+prop_carteCoordBat_inv etat@(Etat {ville = ville, carte = carte}) = let batiments = getBatiments ville
+    in Map.foldrWithKey step True batiments
+    where
+        step :: BatId -> Batiment -> Bool -> Bool
+        step batId batiment acc = acc && hasBatimentAt batId etat
 
 

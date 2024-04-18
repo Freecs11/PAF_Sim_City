@@ -5,6 +5,7 @@ import qualified Data.Map as Map
 
 
 --- all the data types used in the game are defined here 
+-- le GameData contient tous les types et donc est importé par la plupart des modules
 
 
 -- Coordinates of a point in the map
@@ -12,6 +13,12 @@ data Coord = C {cx :: Int ,
                 cy :: Int}
                 deriving (Show , Eq)
 
+instance Ord Coord where
+    compare (C x1 y1) (C x2 y2) = compare (x1 , y1) (x2 , y2)
+
+-- -- Distance between two points
+-- distance :: Coord -> Coord -> Int
+-- distance (C x1 y1) (C x2 y2) = abs (x1 - x2) + abs (y1 - y2)
 
 -- Form of a building or a zone
 data Forme = HSegment Coord Int

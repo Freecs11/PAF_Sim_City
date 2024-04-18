@@ -1,2 +1,7 @@
+-- Spec.hs
+import Test.Hspec
+import qualified FormeTests
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = hspec $ do
+  describe "Forme Tests" FormeTests.spec

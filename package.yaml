@@ -27,6 +27,8 @@ dependencies:
 - random
 - text
 - sdl2-ttf
+- hspec
+- QuickCheck
 
 library:
   source-dirs: src

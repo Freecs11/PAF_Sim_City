@@ -1,5 +1,9 @@
 module Citoyens where
 
+import Data.Map (Map)
+import qualified Data.Map as Map
+
+
 import GameData
 import State 
 
@@ -54,3 +58,30 @@ prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) = let citoyens
         step :: CitId -> Citoyen -> Bool -> Bool
         step citId citoyen acc = acc && hasCitoyenAt citId etat
 
+
+
+-- add a citizen to the carte 
+addCitoyenToCarte :: Coord -> CitId -> Etat -> Etat
+addCitoyenToCarte coord citId etat@(Etat {carte = carte}) = etat {carte = Map.insert coord (BatId 0, citId) carte}
+
+
+updateCitizenNeeds :: CitId -> Etat -> Etat 
+updateCitizenNeeds citId state = 
+    let citoyens = getCitoyens (ville state)
+    in case Map.lookup citId citoyens of
+        Just citoyen -> case citoyen of
+            Immigrant coord _ _ -> state -- à modifié
+            Habitant coord _ _ _ -> state -- à modifié
+            Emigrant coord _ -> state -- à modifié
+        Nothing -> state -- à modifié
+
+
+-- function to add an updateNeeds event for each citizen in the state 
+updateCitizensNeeds :: Etat -> Etat
+updateCitizensNeeds state =     
+    let citoyens = getCitoyens (ville state)
+    in Map.foldrWithKey step state citoyens
+    where
+        step :: CitId -> Citoyen -> Etat -> Etat
+        step citId _ acc = scheduleEvent (currentTime acc + 10000) (UpdateNeeds citId) acc 
+        -- on va mettre à jour les besoins de chaque citoyen dans 10000 unités de temps ( ~ 10 seconde ) , faudra ajuster ce temps pour que ça soit réaliste

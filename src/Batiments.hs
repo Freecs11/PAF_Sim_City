@@ -19,6 +19,7 @@ import qualified SDL.Font as Font
 import qualified Debug.Trace as T
 import qualified Data.Map as Map
 import Data.Map (Map)
+import State
 
 -- get the map of buildings from a city
 getBatiments :: Ville -> Map BatId Batiment

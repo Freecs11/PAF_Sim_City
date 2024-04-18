@@ -61,57 +61,6 @@ loadPerso rdr path tmap smap = do
   return (tmap', smap')
 
 
--- loadBackground :: Renderer-> FilePath -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
--- loadBackground rdr path tmap smap = do
---   tmap' <- TM.loadTexture rdr path (TextureId "grass") tmap
---   let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage (TextureId "grass") (S.mkArea 0 0 640 480)
---   let smap' = SM.addSprite (SpriteId "grass") sprite smap
---   return (tmap', smap')
-
--- | Load the batiment sprite
-loadBatimentT :: Renderer -> TextureMap -> (TextureId, FilePath) -> IO TextureMap
-loadBatimentT rdr tmap (tid, path) = do
-  tmap' <- TM.loadTexture rdr path tid tmap
-  return tmap'
-
--- | Load the batiment sprite
-loadBatimentS :: Renderer -> TextureMap -> (TextureId, FilePath) -> SpriteMap -> IO SpriteMap
-loadBatimentS rdr tmap (tid, path) smap = do
-  tmap' <- TM.loadTexture rdr path tid tmap
-  let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage tid (S.mkArea 0 0 100 100)
-  let smap' = SM.addSprite (SpriteId $ show tid) sprite smap
-  return smap'
-
-display :: Renderer -> TextureMap -> SpriteMap -> String -> [Coord]  -> IO ()
-display _ _ _ _ [] = return ()
-display rdr tmap smap spriteId (c:cs) = do
-  S.displaySprite rdr tmap (SM.fetchSprite (SpriteId spriteId) smap)
-  display rdr tmap smap spriteId cs
-
--- | Display the buildings on the screen
-displayBuildings :: Renderer -> TextureMap -> SpriteMap -> [Batiment] -> IO ()
-displayBuildings rdr tmap smap buildings = do
-  foldM (\_ building -> do
-    buildingSprite <-  Bat.fetchBuildingSprite building tmap
-    S.displaySprite rdr tmap buildingSprite) () buildings
-  return ()
-
-
-  
--- | Display the zones on the screen
-displayZones :: Renderer -> TextureMap -> SpriteMap -> Map.Map ZonId Zone -> IO ()
-displayZones rdr tmap smap zones = do
-  return ()
--- | Display the citizens on the screen
-displayCitizens :: Renderer -> TextureMap -> SpriteMap -> Map.Map CitId Citoyen -> IO ()
-displayCitizens rdr tmap smap citizens = do
-  return ()
-
--- | Display the state of the game
-displayGameState :: Renderer -> TextureMap -> SpriteMap -> GameState -> IO ()
-displayGameState rdr tmap smap (M.GameState city coins _) = do
-  -- Display the buildings
-  displayBuildings rdr tmap smap (Map.elems $ Bat.getBatiments city)
 
 
 menu :: IO (Map.Map String (Int, Int, Int))
@@ -133,19 +82,6 @@ renderMenuItems renderer font menuItems = do
 -- check if the mouse is over a menu item
 isMouseOverMenuItem :: (Int, Int) -> (Int, Int, Int) -> Bool
 isMouseOverMenuItem (x, y) (x', y', w) = x > x' && x < x' + w && y > y' && y < y' + 20
-
-
-displaySelectedBuilding :: Renderer -> Batiment -> TextureMap -> SpriteMap -> String -> MouseState -> [Event] -> [Batiment] -> IO [Batiment]
-displaySelectedBuilding rdr batiment tmap smap selectedBuilding mouse events buildingsInMap = do
-  if Ms.mouseButtonPressed mouse events 
-    then do
-      let (x, y) = Ms.getMousePosition mouse  
-      buildingSprite <-  Bat.fetchBuildingSprite batiment tmap --
-      let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage (getTextureId buildingSprite) (S.mkArea (fromIntegral x) (fromIntegral y) 100 100)  -- Create the sprite at the mouse position , NOT WORKING
-      let spriteId = SpriteId selectedBuilding 
-      let smap' = SM.addSprite spriteId sprite smap 
-      return $ batiment : buildingsInMap
-    else return buildingsInMap
 
 
 
@@ -184,9 +120,8 @@ main = do
                     (TextureId "Atelier", "assets/atelier.bmp"),
                     (TextureId "Epicerie", "assets/epicerie.bmp"),
                     (TextureId "Commissariat", "assets/police.bmp") ]
-  -- chargement des batiments dans la texture map et la sprite map 
-  tmap'' <- foldM (\tm (tid, path) -> loadBatimentT renderer tm (tid, path)) tmap' buildings
-  smap'' <- foldM (\sm (tid, path) -> loadBatimentS renderer tmap'' (tid, path) sm) smap' buildings
+
+
 
 
   -- initialisation de l'état du jeu
@@ -207,7 +142,7 @@ main = do
   font <- Font.load "assets/Nexa-Heavy.ttf" 15
 
   -- lancement de la gameLoop
-  gameLoop 60 renderer tmap'' smap'' kbd gameState mouse font menuItems selectedBuilding []
+  gameLoop 60 renderer tmap' smap' kbd gameState mouse font menuItems selectedBuilding []
 
 gameLoop :: (RealFrac a, Show a) => a -> Renderer -> TextureMap -> SpriteMap -> Keyboard -> GameState -> MouseState -> Font.Font -> Map.Map String (Int, Int, Int) -> String -> [Batiment] -> IO ()
 gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems selectedBuilding batiments = do
@@ -219,18 +154,12 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems selecte
   
   S.displaySprite renderer tmap (SM.fetchSprite (SpriteId "grass") smap)
 
-   -- display the state of the game
-  displayGameState renderer tmap smap gameState
-
   -- display the selected building on the screen top left
   S.displayText renderer font ("Selected building: " <> pack selectedBuilding) (V2 3 5) (V4 255 255 255 255)
 
   -- display menu
   renderMenuItems renderer font menuItems
 
-  -- display selected building
-  let selectedBuilding' = getSelectedBuilding tmap smap selectedBuilding
-  displaySelectedBuilding renderer selectedBuilding' tmap smap selectedBuilding mouse' events batiments 
 
   ---
   present renderer

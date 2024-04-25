@@ -21,15 +21,26 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import State
 
+-- TOCHANGE
+
 -- get the map of buildings from a city
 getBatiments :: Ville -> Map BatId Batiment
-getBatiments Ville { viZones = zones } = Map.fromList $ concatMap getBatimentsFromZone $ Map.toList zones
+getBatiments Ville { viZones = zones , viBat = batiments} = Map.fromList $ concatMap getBatimentsFromZone $ Map.toList zones
     where
         getBatimentsFromZone :: (ZonId, Zone) -> [(BatId, Batiment)]
         getBatimentsFromZone (zoneId, zone) = case zone of
-            ZR _ batiments -> zip (map BatId [0..]) batiments
-            ZI _ batiments -> zip (map BatId [0..]) batiments
-            ZC _ batiments -> zip (map BatId [0..]) batiments
+            ZR _ batimentsId -> foldr (\batId acc -> case Map.lookup batId batiments of
+                Just batiment -> (batId, batiment) : acc
+                Nothing -> acc) [] batimentsId
+            ZI _ batimentsId -> foldr (\batId acc -> case Map.lookup batId batiments of
+                Just batiment -> (batId, batiment) : acc
+                Nothing -> acc) [] batimentsId
+            ZC _ batimentsId -> foldr (\batId acc -> case Map.lookup batId batiments of
+                Just batiment -> (batId, batiment) : acc
+                Nothing -> acc) [] batimentsId
+            Admin _ batId -> case Map.lookup batId batiments of
+                Just batiment -> [(batId, batiment)]
+                Nothing -> []
             _ -> []
 
 
@@ -51,7 +62,7 @@ isBatimentAt coord batId (Etat {ville = ville}) = let batiments = getBatiments v
 prop_carte_coords_valid_Ville :: Etat -> Bool
 prop_carte_coords_valid_Ville etat@(Etat {ville = ville, carte = carte}) = Map.foldrWithKey step True carte
     where
-        step :: Coord -> (BatId, CitId) -> Bool -> Bool
+        step :: Coord -> (BatId, [CitId]) -> Bool -> Bool
         step coord (batId, _) acc = acc && isBatimentAt coord batId etat
         
 -- check if map has a building at a coordinate
@@ -79,5 +90,29 @@ prop_carteCoordBat_inv etat@(Etat {ville = ville, carte = carte}) = let batiment
     where
         step :: BatId -> Batiment -> Bool -> Bool
         step batId batiment acc = acc && hasBatimentAt batId etat
+
+
+-- smaert constructor 
+-- create a building with a unique id
+createBatiment :: BatId -> Batiment -> Etat -> Etat
+createBatiment batId batiment etat@(Etat {ville = ville}) = let batiments = getBatiments ville
+    in etat {ville = ville {viBat = Map.insert batId batiment batiments}}
+
+-- remove a building from the city
+removeBatiment :: BatId -> Etat -> Etat
+removeBatiment batId etat@(Etat {ville = ville}) = let batiments = getBatiments ville
+    in etat {ville = ville {viBat = Map.delete batId batiments}}
+
+-- get the coordinates of a building
+getCoordBatiment :: BatId -> Etat -> Maybe Coord
+getCoordBatiment batId (Etat {ville = ville}) = let batiments = getBatiments ville
+    in case Map.lookup batId batiments of
+        Just bat -> case bat of
+            Cabane _ coord _ _ -> Just coord
+            Atelier _ coord _ _ -> Just coord
+            Epicerie _ coord _ _ -> Just coord
+            Commissariat _ coord -> Just coord
+        Nothing -> Nothing
+
 
 

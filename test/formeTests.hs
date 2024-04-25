@@ -190,4 +190,4 @@ spec = do
   appartientSpec
   adjacentSpec
   collisionSpec
-  -- adjacentesSpec
+  adjacentesSpec

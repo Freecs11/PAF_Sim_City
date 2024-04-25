@@ -71,11 +71,13 @@ data Batiment = Cabane Forme Coord Int [CitId]
 -- Zone data type
 data Zone = Eau Forme
         | Route Forme
-        | ZR Forme [Batiment]
-        | ZI Forme [Batiment]
-        | ZC Forme [Batiment]
-        | Admin Forme Batiment
+        | ZR Forme [BatId]
+        | ZI Forme [BatId]
+        | ZC Forme [BatId]
+        | Admin Forme BatId
         deriving (Show, Eq)
+
+-- MAP BATIMENT to BATid 
 
 -- Occupation data type (what a citizen is doing at a given time)
 data Occupation = Dormir | Travailler | FaireCourses | SeDeplacer Coord
@@ -93,7 +95,8 @@ data Citoyen = Immigrant Coord (Int , Int , Int) Occupation
 
 -- Ville data type
 data Ville = Ville {
-            viZones :: Map ZonId Zone ,
-            viCit :: Map CitId Citoyen
+            viBat :: Map BatId Batiment,
+            viCit :: Map CitId Citoyen,
+            viZones :: Map ZonId Zone            
             }
             deriving (Show , Eq)

@@ -22,7 +22,7 @@ data Event = Move Coord CitId -- évenement pour déplacer un citoyen vers un Co
 data Etat =  Etat {
         ville :: Ville,
         coins :: Int,
-        carte :: Map Coord (BatId, CitId),
+        carte :: Map Coord (BatId, [CitId]), -- pas bien 
         currentTime :: Int , -- temps actuel du jeu , utilise un entier pour l'instant
         events :: Map Int [Event] 
         -- on va stocker les évenements à faire à un temps donné , 
@@ -49,14 +49,16 @@ processEvents tick state@(Etat { events = evs }) =
 
 
 -- Et c'est ici qu'on va traiter les évenements individuellement
-processEvent :: Event -> Etat -> Etat
-processEvent event state = state -- à modifié
-    -- à définir ces fonctions dans les modules correspondants (Citoyens.hs, Batiments.hs, etc.)
-    -- case event of
-    --     Move coord citId -> moveCitizen coord citId state
-    --     StartWork citId -> startWork citId state
-    --     GoShopping citId -> goShopping citId state
-    --     GoHome citId -> goHome citId state
-    --     UpdateNeeds citId -> updateNeeds citId state
-    --     _ -> state
+-- processEvent :: Event -> Etat -> Etat
+-- processEvent event state = state 
+--     case event of
+--         Move coord citId -> moveCitizen coord citId state
+--         StartWork citId -> startWork citId state
+--         GoShopping citId -> goShopping citId state
+--         GoHome citId -> goHome citId state
+--         UpdateNeeds citId -> updateNeeds citId state
+--         _ -> state
+
+
+
 

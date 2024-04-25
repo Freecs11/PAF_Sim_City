@@ -16,7 +16,8 @@ getCitoyens Ville { viCit = citoyens } = citoyens
 
 -- -- check if a citizen is at a coordinate
 isCitoyenAt :: Coord -> CitId -> Etat -> Bool
-isCitoyenAt coord citId (Etat {ville = ville}) = let citoyens = getCitoyens ville
+isCitoyenAt coord citId (Etat {ville = ville}) = 
+    let citoyens = getCitoyens ville
     in case Map.lookup citId citoyens of
         Just citoyen -> case citoyen of
             Immigrant coord' _ _ -> coord == coord'
@@ -28,16 +29,18 @@ isCitoyenAt coord citId (Etat {ville = ville}) = let citoyens = getCitoyens vill
 -- -- meaning that the citizen at the coord in Carte has the same citId
 -- -- as the one in the state
 prop_carte_coords_valid_Ville :: Etat -> Bool
-prop_carte_coords_valid_Ville etat@(Etat {ville = ville, carte = carte}) = Map.foldrWithKey step True carte
+prop_carte_coords_valid_Ville etat@(Etat {ville = ville, carte = carte}) =
+    Map.foldrWithKey step True carte
     where
-        step :: Coord -> (BatId, CitId) -> Bool -> Bool
-        step coord (_, citId) acc = acc && isCitoyenAt coord citId etat
+        step :: Coord -> (BatId, [CitId]) -> Bool -> Bool
+        step coord (_, citIds) acc = acc && all (\citId -> isCitoyenAt coord citId etat) citIds
 
 -- -- check if map has a citizen at a coordinate
 hasCitoyenAt :: CitId -> Etat -> Bool
-hasCitoyenAt citId etat@(Etat {ville = ville , carte =c }) = let citoyens = getCitoyens ville
+hasCitoyenAt citId etat@(Etat {ville = ville , carte =c }) = 
+    let citoyens = getCitoyens ville
     in case Map.lookup citId citoyens of
-        Just cit -> case cit of
+        Just cit -> case cit of 
             Immigrant coord _ _ -> lookUpCarteWithCitID coord etat citId
             Habitant coord _ _ _ -> lookUpCarteWithCitID coord etat citId
             Emigrant coord _ -> lookUpCarteWithCitID coord etat citId
@@ -45,43 +48,70 @@ hasCitoyenAt citId etat@(Etat {ville = ville , carte =c }) = let citoyens = getC
 
 -- -- lookup if the citizen at a coordinate in the carte match the citId
 lookUpCarteWithCitID :: Coord -> Etat -> CitId -> Bool
-lookUpCarteWithCitID coord (Etat {carte = carte}) citId = case Map.lookup coord carte of
-    Just (_, citId') -> citId == citId'
-    Nothing -> False
+lookUpCarteWithCitID coord (Etat {carte = carte}) citId = 
+    case Map.lookup coord carte of
+        Just (_, citIds) -> elem citId citIds
+        Nothing -> False
 
--- -- verify if all the citizens have coherent coords with the carte of the state
--- -- meaning that the carte has the same citId as the citizen at the same coord
+-- -- get the citizen at a coordinate
+getCitoyenAt :: Coord -> Etat -> Maybe CitId
+getCitoyenAt coord (Etat {ville = ville}) = 
+    let citoyens = getCitoyens ville
+    in case Map.foldrWithKey step Nothing citoyens of
+        Just citId -> Just citId
+        Nothing -> Nothing
+    where
+        step :: CitId -> Citoyen -> Maybe CitId -> Maybe CitId
+        step citId cit acc = case cit of
+            Immigrant coord' _ _ -> if coord == coord' then Just citId else acc
+            Habitant coord' _ _ _ -> if coord == coord' then Just citId else acc
+            Emigrant coord' _ -> if coord == coord' then Just citId else acc
+
+-- -- get the coordinates of a citizen
+getCoordCitoyen :: CitId -> Etat -> Maybe Coord
+getCoordCitoyen citId (Etat {ville = ville}) = 
+    let citoyens = getCitoyens ville
+    in case Map.lookup citId citoyens of
+        Just cit -> case cit of
+            Immigrant coord _ _ -> Just coord
+            Habitant coord _ _ _ -> Just coord
+            Emigrant coord _ -> Just coord
+        Nothing -> Nothing
+
+
 prop_carteCoordCit_inv :: Etat -> Bool
-prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) = let citoyens = getCitoyens ville
+prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) = 
+    let citoyens = getCitoyens ville
     in Map.foldrWithKey step True citoyens
     where
         step :: CitId -> Citoyen -> Bool -> Bool
-        step citId citoyen acc = acc && hasCitoyenAt citId etat
+        step citId _ acc = acc && case getCoordCitoyen citId etat of
+            Just coord -> isCitoyenAt coord citId etat
+            Nothing -> False
 
 
+-- smart constructor
+-- create a citizen with a unique id
+createCitoyen :: CitId -> Citoyen -> Etat -> Etat
+createCitoyen citId citoyen etat@(Etat {ville = ville}) = 
+    let citoyens = getCitoyens ville
+    in etat {ville = ville {viCit = Map.insert citId citoyen citoyens}}
 
--- add a citizen to the carte 
-addCitoyenToCarte :: Coord -> CitId -> Etat -> Etat
-addCitoyenToCarte coord citId etat@(Etat {carte = carte}) = etat {carte = Map.insert coord (BatId 0, citId) carte}
+-- remove a citizen from the city
+removeCitoyen :: CitId -> Etat -> Etat
+removeCitoyen citId etat@(Etat {ville = ville}) = 
+    let citoyens = getCitoyens ville
+    in etat {ville = ville {viCit = Map.delete citId citoyens}}
 
-
-updateCitizenNeeds :: CitId -> Etat -> Etat 
-updateCitizenNeeds citId state = 
-    let citoyens = getCitoyens (ville state)
+-- get the occupation of a citizen
+getOccupationCitoyen :: CitId -> Etat -> Maybe Occupation
+getOccupationCitoyen citId (Etat {ville = ville}) = 
+    let citoyens = getCitoyens ville
     in case Map.lookup citId citoyens of
-        Just citoyen -> case citoyen of
-            Immigrant coord _ _ -> state -- à modifié
-            Habitant coord _ _ _ -> state -- à modifié
-            Emigrant coord _ -> state -- à modifié
-        Nothing -> state -- à modifié
+        Just cit -> case cit of
+            Immigrant _ _ occ -> Just occ
+            Habitant _ _ _ occ -> Just occ
+            Emigrant _ occ -> Just occ
+        Nothing -> Nothing
 
-
--- function to add an updateNeeds event for each citizen in the state 
-updateCitizensNeeds :: Etat -> Etat
-updateCitizensNeeds state =     
-    let citoyens = getCitoyens (ville state)
-    in Map.foldrWithKey step state citoyens
-    where
-        step :: CitId -> Citoyen -> Etat -> Etat
-        step citId _ acc = scheduleEvent (currentTime acc + 10000) (UpdateNeeds citId) acc 
-        -- on va mettre à jour les besoins de chaque citoyen dans 10000 unités de temps ( ~ 10 seconde ) , faudra ajuster ce temps pour que ça soit réaliste
+        

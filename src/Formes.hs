@@ -114,43 +114,29 @@ prop_collision_precondition f1 f2 = prop_limites_precondition f1 && prop_limites
 -- Forme -> Bool qui prend en entr´ee deux formes et d´ecide si les deux formes sont adjacentes (elle ne sont
 -- pas en collision, mais au moins une case de la premi`ere forme est adjacente `a la deuxi`eme).
 --- NE MARCHE PAS ACTUELLEMENT --- a corriger
--- adjacentes :: Forme -> Forme -> Bool
--- adjacentes f1 f2 = 
---     let (n1, s1, o1, e1) = limites f1
---         (n2, s2, o2, e2) = limites f2
---     in not (collision f1 f2) && (
---         (n1 == s2 || s1 == n2) && (o1 <= e2 && e1 >= o2) ||
---         (o1 == e2 || e1 == o2) && (n1 <= s2 && s1 >= n2))
-
-    -- problem with the postcondition and tests in formeTests.hs .....
---          (VSegment (C {cx = 0, cy = 0}) 1,HSegment (C {cx = 0, cy = 0}) 1)
---         (VSegment (C {cx = 0, cy = 0}) 1 => limites = (0, 0, 0, 0)
---         HSegment (C {cx = 0, cy = 0}) 1 => limites = (0, 0, 0, 0)
---         (0 == 0 + 1 || 0 == 0 - 1) && 0 >= 0 && 0 < 0 + 1 => False
---         (0 + 1 == 0 || 0 - 1 == 0) && 0 >= 0 && 0 < 0 + 1 => False
---         ((0 == 0 + 1 || 0 == 0 - 1) && 0 >= 0 && 0 < 0 + 1) || ((0 + 1 == 0 || 0 - 1 == 0) && 0 >= 0 && 0 < 0 + 1) => False
---         appartient (C {cx = 0, cy = 0}) (HSegment (C {cx = 0, cy = 0}) 1) => True 
---         appartient (C {cx = 0, cy = 0}) (VSegment (C {cx = 0, cy = 0}) 1) => True
---         collision (HSegment (C {cx = 0, cy = 0}) 1) (VSegment (C {cx = 0, cy = 0}) 1) => False
---         so adjacentes (VSegment (C {cx = 0, cy = 0}) 1) (HSegment (C {cx = 0, cy = 0}) 1) => False
---         so adjacentes (HSegment (C {cx = 0, cy = 0}) 1) (VSegment (C {cx = 0, cy = 0}) 1) => False
-
-
+-- une fonction adjacentes :: Forme -> Forme -> Bool qui prend en entr´ee deux formes et d´ecide si les deux formes sont adjacentes 
+-- (c’est-`a-dire si elles se touchent sans se superposer).
+adjacentes :: Forme -> Forme -> Bool
+adjacentes f1 f2 = let (y1, y2, x1, x2) = limites f1
+                    in adjacent (C x1 y1) f2 
+                    || adjacent (C x2 y2) f2 
+                    || adjacent (C x1 y2) f2 
+                    || adjacent (C x2 y1) f2
 
 
 -- adjacentes invariant and postcondition
--- prop_adjacentes_invariant :: Forme -> Forme -> Bool
--- prop_adjacentes_invariant f1 f2 = 
---     adjacentes f1 f2 == adjacentes f2 f1
+prop_adjacentes_invariant :: Forme -> Forme -> Bool
+prop_adjacentes_invariant f1 f2 = 
+    adjacentes f1 f2 == adjacentes f2 f1
 
--- prop_adjacentes_precondition :: Forme -> Forme -> Bool
--- prop_adjacentes_precondition f1 f2 = prop_limites_precondition f1 && prop_limites_precondition f2
+prop_adjacentes_precondition :: Forme -> Forme -> Bool
+prop_adjacentes_precondition f1 f2 = prop_limites_precondition f1 && prop_limites_precondition f2
 
--- prop_adjacentes_postcondition :: Forme -> Forme -> Bool
--- prop_adjacentes_postcondition f1 f2 = 
---     adjacentes f1 f2 == 
---     (let (n1, s1, o1, e1) = limites f1
---          (n2, s2, o2, e2) = limites f2
---      in ((n1 == s2 || s1 == n2) && (o1 <= e2 && e1 >= o2)) ||
---         ((o1 == e2 || e1 == o2) && (n1 <= s2 && s1 >= n2)))
+prop_adjacentes_postcondition :: Forme -> Forme -> Bool
+prop_adjacentes_postcondition f1 f2 = 
+    adjacentes f1 f2 == 
+    (let (n1, s1, o1, e1) = limites f1
+         (n2, s2, o2, e2) = limites f2
+     in ((n1 == s2 || s1 == n2) && (o1 <= e2 && e1 >= o2)) ||
+        ((o1 == e2 || e1 == o2) && (n1 <= s2 && s1 >= n2)))
 -- SDL SPECIFIC FUNCTIONS

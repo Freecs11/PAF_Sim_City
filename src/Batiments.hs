@@ -25,25 +25,7 @@ import State
 
 -- get the map of buildings from a city
 getBatiments :: Ville -> Map BatId Batiment
-getBatiments Ville { viZones = zones , viBat = batiments} = Map.fromList $ concatMap getBatimentsFromZone $ Map.toList zones
-    where
-        getBatimentsFromZone :: (ZonId, Zone) -> [(BatId, Batiment)]
-        getBatimentsFromZone (zoneId, zone) = case zone of
-            ZR _ batimentsId -> foldr (\batId acc -> case Map.lookup batId batiments of
-                Just batiment -> (batId, batiment) : acc
-                Nothing -> acc) [] batimentsId
-            ZI _ batimentsId -> foldr (\batId acc -> case Map.lookup batId batiments of
-                Just batiment -> (batId, batiment) : acc
-                Nothing -> acc) [] batimentsId
-            ZC _ batimentsId -> foldr (\batId acc -> case Map.lookup batId batiments of
-                Just batiment -> (batId, batiment) : acc
-                Nothing -> acc) [] batimentsId
-            Admin _ batId -> case Map.lookup batId batiments of
-                Just batiment -> [(batId, batiment)]
-                Nothing -> []
-            _ -> []
-
-
+getBatiments Ville { viZones = zones , viBat = batiments} = batiments
 
 -- check if a building is at a coordinate
 isBatimentAt :: Coord -> BatId -> Etat -> Bool
@@ -95,13 +77,45 @@ prop_carteCoordBat_inv etat@(Etat {ville = ville, carte = carte}) = let batiment
 -- smaert constructor 
 -- create a building with a unique id
 createBatiment :: BatId -> Batiment -> Etat -> Etat
-createBatiment batId batiment etat@(Etat {ville = ville}) = let batiments = getBatiments ville
-    in etat {ville = ville {viBat = Map.insert batId batiment batiments}}
+createBatiment batId batiment etat@(Etat {ville = ville}) =
+    let batiments = Map.insert batId batiment $ getBatiments ville
+    in etat {ville = ville {viBat = batiments}
+    , carte = insertBatimentInCarte batId etat
+    }
 
+    
 -- remove a building from the city
 removeBatiment :: BatId -> Etat -> Etat
-removeBatiment batId etat@(Etat {ville = ville}) = let batiments = getBatiments ville
-    in etat {ville = ville {viBat = Map.delete batId batiments}}
+removeBatiment batId etat@(Etat {ville = ville}) = 
+    let batiments = Map.delete batId $ getBatiments ville
+    in etat {ville = ville {viBat = batiments}
+    , carte = removeBatimentFromCarte batId etat
+    }
+
+-- insert a building in the carte
+insertBatimentInCarte :: BatId -> Etat -> Map Coord (BatId, [CitId])
+insertBatimentInCarte batId etat@(Etat {ville = ville, carte = carte}) = 
+    let maybeCoord = getCoordBatiment batId etat
+    in case maybeCoord of
+        Just coord -> case Map.lookup coord carte of
+            Just (batId', citIds) -> 
+                if batId' == batId then carte
+                else Map.insert coord (batId, citIds) carte -- à changer , là on écrase les batiments qui sont déjà à cette coordonnée
+            Nothing -> Map.insert coord (batId, []) carte
+        Nothing -> carte
+
+
+-- remove a building from the carte same way as removeCitFromCarte
+removeBatimentFromCarte :: BatId -> Etat -> Map Coord (BatId, [CitId])
+removeBatimentFromCarte batId etat@(Etat {carte = carte}) = 
+    let maybeCoord = getCoordBatiment batId etat
+    in case maybeCoord of
+        Just coord -> case Map.lookup coord carte of
+            Just (batId', citIds) -> 
+                if batId' == batId then Map.delete coord carte
+                else carte
+            Nothing -> carte
+        Nothing -> carte
 
 -- get the coordinates of a building
 getCoordBatiment :: BatId -> Etat -> Maybe Coord
@@ -112,7 +126,37 @@ getCoordBatiment batId (Etat {ville = ville}) = let batiments = getBatiments vil
             Atelier _ coord _ _ -> Just coord
             Epicerie _ coord _ _ -> Just coord
             Commissariat _ coord -> Just coord
+
         Nothing -> Nothing
+
+-- get the building at a coordinate
+getBatimentAt :: Coord -> Etat -> Maybe Batiment
+getBatimentAt coord (Etat {ville = ville}) = let batiments = getBatiments ville
+    in case Map.foldrWithKey step Nothing batiments of
+        Just bat -> Just bat
+        Nothing -> Nothing
+    where
+        step :: BatId -> Batiment -> Maybe Batiment -> Maybe Batiment
+        step batId bat acc = case bat of
+            Cabane _ coord' _ _ -> if coord == coord' then Just bat else acc
+            Atelier _ coord' _ _ -> if coord == coord' then Just bat else acc
+            Epicerie _ coord' _ _ -> if coord == coord' then Just bat else acc
+            Commissariat _ coord' -> if coord == coord' then Just bat else acc
+            _ -> acc
+
+-- get the last batId in the city
+getLastBatId :: Etat -> BatId
+getLastBatId (Etat {ville = ville}) = let batiments = getBatiments ville
+    in case Map.foldrWithKey step Nothing batiments of
+        Just batId -> batId
+        Nothing -> BatId 0
+    where
+        step :: BatId -> Batiment -> Maybe BatId -> Maybe BatId
+        step batId _ acc = case acc of
+            Just acc' -> if batId > acc' then Just batId else acc
+            Nothing -> Just batId
+            
+
 
 
 

@@ -157,29 +157,29 @@ collisionSpec = do
 
 --- NE MARCHE PAS ACTUELLEMENT ---
 -- donc faut revoir toute la fonction adjacentes ou alors la supprimer ...
--- adjacentesSpec :: Spec
--- adjacentesSpec = do
---   describe "Formes.adjacentes" $ do
---     it "identifies two orthogonal segments meeting at a point as adjacent" $ do
---       let vSegment = VSegment (C 0 0) 1
---           hSegment = HSegment (C 0 0) 1 
---       adjacentes vSegment hSegment `shouldBe` True -- ca renvoie une erreur sur ce test ...... 
+adjacentesSpec :: Spec
+adjacentesSpec = do
+  describe "Formes.adjacentes" $ do
+    it "identifies two forms as adjacent when they meet edge to edge horizontally" $ do
+      let form1 = HSegment (C 0 0) 5
+          form2 = HSegment (C 5 0) 5
+      adjacentes form1 form2 `shouldBe` True
 
---     it "correctly identifies if two Formes are adjacent" $
---       property $ \(forme1 :: Forme, forme2 :: Forme) ->
---         let (n1, s1, w1, e1) = limites forme1
---             (n2, s2, w2, e2) = limites forme2
---             points = [(x, y) | x <- [w1..e1], y <- [n1..s1]]
---         in adjacentes forme1 forme2 ==
---            any (\(x, y) -> adjacent (C x y) forme1 && adjacent (C x y) forme2) points
+    it "identifies two forms as adjacent when they meet edge to edge vertically" $ do
+      let form1 = VSegment (C 0 0) 5
+          form2 = VSegment (C 0 5) 5
+      adjacentes form1 form2 `shouldBe` True
 
---     it "obeys the precondition that all dimensions are positive" $
---       property $ \(forme1 :: Forme, forme2 :: Forme) ->
---         prop_adjacentes_precondition forme1 forme2 ==> True
+    it "does not identify forms as adjacent if they only touch at a corner" $ do
+      let form1 = Rectangle (C 0 0) 5 5
+          form2 = Rectangle (C 5 5) 5 5
+      adjacentes form1 form2 `shouldBe` False
 
---     it "obeys the postcondition that adjacentes returns the correct value" $
---       property $ \(forme1 :: Forme, forme2 :: Forme) ->
---         prop_adjacentes_postcondition forme1 forme2
+    it "does not identify forms as adjacent if there is a gap" $ do
+      let form1 = Rectangle (C 0 0) 5 5
+          form2 = Rectangle (C 7 0) 5 5
+      adjacentes form1 form2 `shouldBe` False
+
 
 
 

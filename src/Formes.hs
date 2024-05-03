@@ -109,19 +109,11 @@ prop_collision_postcondition f1 f2 =
 prop_collision_precondition :: Forme -> Forme -> Bool
 prop_collision_precondition f1 f2 = prop_limites_precondition f1 && prop_limites_precondition f2
 
--- adjacentes : deux formes adjacentes 
--- adjacentes :: Forme ->
--- Forme -> Bool qui prend en entr´ee deux formes et d´ecide si les deux formes sont adjacentes (elle ne sont
--- pas en collision, mais au moins une case de la premi`ere forme est adjacente `a la deuxi`eme).
---- NE MARCHE PAS ACTUELLEMENT --- a corriger
--- une fonction adjacentes :: Forme -> Forme -> Bool qui prend en entr´ee deux formes et d´ecide si les deux formes sont adjacentes 
--- (c’est-`a-dire si elles se touchent sans se superposer).
 adjacentes :: Forme -> Forme -> Bool
 adjacentes f1 f2 = let (y1, y2, x1, x2) = limites f1
-                    in adjacent (C x1 y1) f2 
-                    || adjacent (C x2 y2) f2 
-                    || adjacent (C x1 y2) f2 
-                    || adjacent (C x2 y1) f2
+                       (y1', y2', x1', x2') = limites f2
+                   in (x2 + 1 == x1' || x1 - 1 == x2') && (y1 <= y2' && y2 >= y1') ||
+                      (y2 + 1 == y1' || y1 - 1 == y2') && (x1 <= x2' && x2 >= x1')
 
 
 -- adjacentes invariant and postcondition
@@ -139,4 +131,5 @@ prop_adjacentes_postcondition f1 f2 =
          (n2, s2, o2, e2) = limites f2
      in ((n1 == s2 || s1 == n2) && (o1 <= e2 && e1 >= o2)) ||
         ((o1 == e2 || e1 == o2) && (n1 <= s2 && s1 >= n2)))
--- SDL SPECIFIC FUNCTIONS
+
+

@@ -5,7 +5,6 @@ import qualified Data.Map as Map
 
 
 import GameData
-import State 
 
 
 -- -- get the citizens from the ville
@@ -89,7 +88,7 @@ prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) =
             Just coord -> isCitoyenAt coord citId etat
             Nothing -> False
 
--- update the citizen in the carte
+-- update the citizen in the carte 
 updateCit :: CitId -> Map Coord (BatId, [CitId]) -> Etat -> Map Coord (BatId, [CitId])
 updateCit citId carte etat = 
     -- get the coordinates of the citizen
@@ -154,10 +153,6 @@ moveCitizen newCoord citId etat@(Etat { ville = ville, carte = carte }) =
         maybeCitoyen = Map.lookup citId (viCit ville)
         -- Fetch the current coordinates of the citizen
         maybeCitCoord = getCoordCitoyen citId etat
-        -- Fetch the current coordinates of the citizen in the carte
-        maybeCitCoordCarte = case maybeCitCoord of
-            Just coord -> Just coord
-            Nothing -> Nothing
 
         -- Update the citizen's coordinates
         updatedCitoyen = case maybeCitoyen of
@@ -168,7 +163,7 @@ moveCitizen newCoord citId etat@(Etat { ville = ville, carte = carte }) =
         updatedCitoyens = Map.insert citId updatedCitoyen (viCit ville)
 
         -- Update the carte
-        updatedCarte = case maybeCitCoordCarte of
+        updatedCarte = case maybeCitCoord of
             Just coord -> case Map.lookup coord carte of
                 Just (batId, citIds) -> Map.insert coord (batId, filter (/= citId) citIds) carte
                 Nothing -> carte

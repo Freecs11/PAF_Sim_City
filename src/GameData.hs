@@ -100,3 +100,27 @@ data Ville = Ville {
             viZones :: Map ZonId Zone            
             }
             deriving (Show , Eq)
+
+
+data Event = Move Coord CitId -- évenement pour déplacer un citoyen vers un Coord ( normalement celui d'un batiment)
+           | StartWork CitId -- commence le travaille , va rajouté dans l'état le temps de fin de travail du citoyen comme currentTime + temps de travail
+           -- comme ça si le temps de travail est fini on peut le faire rentrer chez lui en rajoutant un autre évenement GoHome
+           | GoShopping CitId -- commence le shopping, meme principe que StartWork
+           | GoHome CitId -- rentre chez lui , il signifie que le citoyen a fini son travail ou son shopping et qu'il rentre chez lui directement ( suivant le chemin le plus court)
+           | UpdateNeeds CitId -- met à jour les besoins du citoyen ( du genre faim, soif, etc.  qui décroit avec le temps) , donc on va rajouter un évenement pour mettre à jour les besoins de chaque citoyen à chaque tour de boucle
+           deriving (Eq, Show)
+
+-- on va stocker les évenements à faire à un temps donné , 
+-- ce que j'imagine c'est dans la boucle de jeu on va regarder si on a des évenements à faire à currentTime et on les fait
+-- et on les enlève de la liste des évenements
+data Etat =  Etat {
+        ville :: Ville,
+        coins :: Int,
+        carte :: Map Coord (BatId, [CitId]), -- on va stocker les batiments et les citoyens à chaque coordonnée
+        currentTime :: Int , -- temps actuel du jeu , utilise un entier pour l'instant
+        events :: Map Int [Event] 
+    }
+    deriving (Show, Eq)
+
+getCarte :: Etat -> Map Coord (BatId, [CitId])
+getCarte (Etat {carte = c}) = c

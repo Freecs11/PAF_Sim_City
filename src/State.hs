@@ -5,38 +5,13 @@ module State where
 -- we'll serve for simulation too
 
 import GameData
-import Batiments
+import Batiments 
 import Citoyens
-import Formes
+import Formes 
 
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-
-data Event = Move Coord CitId -- évenement pour déplacer un citoyen vers un Coord ( normalement celui d'un batiment)
-           | StartWork CitId -- commence le travaille , va rajouté dans l'état le temps de fin de travail du citoyen comme currentTime + temps de travail
-           -- comme ça si le temps de travail est fini on peut le faire rentrer chez lui en rajoutant un autre évenement GoHome
-           | GoShopping CitId -- commence le shopping, meme principe que StartWork
-           | GoHome CitId -- rentre chez lui , il signifie que le citoyen a fini son travail ou son shopping et qu'il rentre chez lui directement ( suivant le chemin le plus court)
-           | UpdateNeeds CitId -- met à jour les besoins du citoyen ( du genre faim, soif, etc.  qui décroit avec le temps) , donc on va rajouter un évenement pour mettre à jour les besoins de chaque citoyen à chaque tour de boucle
-           deriving (Eq, Show)
-
-
-data Etat =  Etat {
-        ville :: Ville,
-        coins :: Int,
-        carte :: Map Coord (BatId, [CitId]), -- on va stocker les batiments et les citoyens à chaque coordonnée
-        currentTime :: Int , -- temps actuel du jeu , utilise un entier pour l'instant
-        events :: Map Int [Event] 
-        -- on va stocker les évenements à faire à un temps donné , 
-        -- ce que j'imagine c'est dans la boucle de jeu on va regarder si on a des évenements à faire à currentTime et on les fait
-        -- et on les enlève de la liste des évenements
-    }
-    deriving (Show, Eq)
-
-
-getCarte :: Etat -> Map Coord (BatId, [CitId])
-getCarte (Etat {carte = c}) = c
 
 -- On va utiliser une fonction pour ajouter un évenement à un temps donné
 -- Ex : scheduleEvent (getCurrentTime + 1000) (Move (getHomeCoord citoyen) citoyenId) etat 
@@ -60,51 +35,20 @@ processEvent :: Event -> Etat -> Etat
 processEvent event state = case event of
     Move coord citId -> moveCitizen coord citId state
     StartWork citId -> startWork citId state
-    GoShopping citId -> goShopping citId state
-    GoHome citId -> goHome citId state
-    UpdateNeeds citId -> updateNeeds citId state
+    -- GoShopping citId -> goShopping citId state
+    -- GoHome citId -> goHome citId state
+    -- UpdateNeeds citId -> updateNeeds citId state
     _ -> state
 
 
-
-startWork :: CitId -> Etat -> Etat
-startWork citId state = 
-    let cit = getCitoyen citId state
-        workPlace = getWorkPlace cit state
-        workTime = getWorkTime workPlace
-        endTime = currentTime state + workTime
-    in scheduleEvent endTime (GoHome citId) state
-
-
-goShopping :: CitId -> Etat -> Etat
-goShopping citId state = 
-    let cit = getCitoyen citId state
-        shopPlace = getShopPlace cit state
-        shopTime = getShopTime shopPlace
-        endTime = currentTime state + shopTime
-    in scheduleEvent endTime (GoHome citId) state
-
-goHome :: CitId -> Etat -> Etat
-goHome citId state = 
-    let cit = getCitoyen citId state
-        homeCoord = getHomeCoord cit
-    in moveCitizen homeCoord citId state
-
-updateNeeds :: CitId -> Etat -> Etat
-updateNeeds citId state = 
-    let cit = getCitoyen citId state
-        updatedCit = updateCitoyen cit
-    in updateCitoyenInVille citId updatedCit state
-
--- update the citizen in the city
-updateCitoyenInVille :: CitId -> Citoyen -> Etat -> Etat
-updateCitoyenInVille citId citoyen etat@(Etat {ville = ville}) = 
-    let citoyens = getCitoyens ville 
-    in etat {ville = ville {viCit = Map.insert citId citoyen citoyens       
-    } , carte = updateCit citId (carte etat) etat }
-    
-
-
-
-
-
+-- startWork :: CitId -> Etat -> Etat
+-- startWork citId state@(Etat { ville = ville }) =
+--     let citoyens = getCitoyens ville
+--     in case Map.lookup citId citoyens of
+--         Just citoyen -> case citoyen of
+--             Habitant coord _ (batId, _, _) _ -> 
+--                 let MaybeCoordBatiment = getBatimentCoord batId state
+--                 in case MaybeCoordBatiment of
+--                     -- to do 
+--             _ -> state
+--         Nothing -> state

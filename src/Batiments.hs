@@ -19,7 +19,6 @@ import qualified SDL.Font as Font
 import qualified Debug.Trace as T
 import qualified Data.Map as Map
 import Data.Map (Map)
-import State
 
 -- TOCHANGE
 

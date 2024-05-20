@@ -3,13 +3,12 @@ module Citoyens where
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import AStarPathfinding
+
+import qualified Data.Set as Set
+
 
 import GameData
-
-
--- -- get the citizens from the ville
-getCitoyens :: Ville -> Map CitId Citoyen
-getCitoyens Ville { viCit = citoyens } = citoyens
 
 
 
@@ -52,21 +51,17 @@ lookUpCarteWithCitID coord (Etat {carte = carte}) citId =
         Just (_, citIds) -> elem citId citIds
         Nothing -> False
 
--- -- get the citizen at a coordinate
+-- -- get the citizen at a coordinate ( we take the first citizen in the list)
 getCitoyenAt :: Coord -> Etat -> Maybe CitId
-getCitoyenAt coord (Etat {ville = ville}) = 
-    let citoyens = getCitoyens ville
-    in case Map.foldrWithKey step Nothing citoyens of
-        Just citId -> Just citId
+getCitoyenAt coord (Etat {carte=carte}) = 
+    case Map.lookup coord carte of
+        Just (_, citIds) -> case citIds of
+            [] -> Nothing
+            (citId:_) -> Just citId
         Nothing -> Nothing
-    where
-        step :: CitId -> Citoyen -> Maybe CitId -> Maybe CitId
-        step citId cit acc = case cit of
-            Immigrant coord' _ _ -> if coord == coord' then Just citId else acc
-            Habitant coord' _ _ _ -> if coord == coord' then Just citId else acc
-            Emigrant coord' _ -> if coord == coord' then Just citId else acc
 
--- -- get the coordinates of a citizen
+
+-- get the coordinates of a citizen
 getCoordCitoyen :: CitId -> Etat -> Maybe Coord
 getCoordCitoyen citId (Etat {ville = ville}) = 
     let citoyens = getCitoyens ville
@@ -78,6 +73,7 @@ getCoordCitoyen citId (Etat {ville = ville}) =
         Nothing -> Nothing
 
 
+-- verify if all the citizens have coherent coords with the carte of the state
 prop_carteCoordCit_inv :: Etat -> Bool
 prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) = 
     let citoyens = getCitoyens ville
@@ -85,98 +81,56 @@ prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) =
     where
         step :: CitId -> Citoyen -> Bool -> Bool
         step citId _ acc = acc && case getCoordCitoyen citId etat of
-            Just coord -> isCitoyenAt coord citId etat
+            Just coord -> 
+                let (_ , citIds) = case Map.lookup coord carte of
+                        Just x -> x
+                        Nothing -> (BatId 0, [])
+                in elem citId citIds && isCitoyenAt coord citId etat -- on vérifie que le citoyen est bien à la coordonnée sur la carte et sur le citoyen lui même
             Nothing -> False
 
--- update the citizen in the carte 
-updateCit :: CitId -> Map Coord (BatId, [CitId]) -> Etat -> Map Coord (BatId, [CitId])
-updateCit citId carte etat = 
-    -- get the coordinates of the citizen
-    let maybeCoord = getCoordCitoyen citId etat
-    in case maybeCoord of
-        Just coord -> 
-            -- get the current citizen IDs at the coordinate
-            let maybeCitIds = Map.lookup coord carte
-            in case maybeCitIds of
-                Just (batId, citIds) -> 
-                    -- check if the citizen ID is already in the list , if not add it
-                    if elem citId citIds then carte
-                    else Map.insert coord (batId, citId:citIds) carte
-                Nothing -> carte
-        Nothing -> carte
 
 
 -- smart constructor
 -- create a citizen with a unique id
-createCitoyen :: CitId -> Citoyen -> Etat -> Etat
-createCitoyen citId citoyen etat@(Etat {ville = ville}) = 
-    let citoyens = getCitoyens ville 
-    in
-    let carte = getCarte etat
-    in etat {ville = ville {viCit = Map.insert citId citoyen citoyens       
-    } , carte = updateCit citId carte etat }
-
--- -- remove a citizen from the carte
-removeCitFromCarte :: CitId -> Etat -> Map Coord (BatId, [CitId])
-removeCitFromCarte citId etat@(Etat {carte = carte}) = 
-    let maybeCoord = getCoordCitoyen citId etat
-    in case maybeCoord of
-        Just coord -> case Map.lookup coord carte of
-            Just (batId, citIds) -> Map.insert coord (batId, filter (/= citId) citIds) carte
-            Nothing -> carte
-        Nothing -> carte
-
--- remove a citizen from the city
-removeCitoyen :: CitId -> Etat -> Etat
-removeCitoyen citId etat@(Etat {ville = ville}) = 
+createCitoyen :: Citoyen -> Etat -> Etat
+createCitoyen citoyen etat@(Etat {ville = ville}) = 
     let citoyens = getCitoyens ville
-    in etat {ville = ville {viCit = Map.delete citId citoyens}
-        , carte = removeCitFromCarte citId etat}
+        citId = CitId (show $ Map.size citoyens)
+        updatedCitoyens = Map.insert citId citoyen citoyens
+        updateCarte = updateCarteCitoyen citId etat
+    in etat {ville = ville {viCit = updatedCitoyens}, carte = updateCarte}
 
--- get the occupation of a citizen
-getOccupationCitoyen :: CitId -> Etat -> Maybe Occupation
-getOccupationCitoyen citId (Etat {ville = ville}) = 
+-- update the carte with the new citizen
+updateCarteCitoyen :: CitId -> Etat -> Map Coord (BatId, [CitId])
+updateCarteCitoyen citId etat@(Etat {carte = carte}) = 
+    let coord = getCoordCitoyen citId etat
+    in case coord of
+        Just coord' -> 
+            let (batId, citIds) = case Map.lookup coord' carte of
+                    Just x -> x
+                    Nothing -> (BatId 0, []) -- 0 is for people who are have no home
+                updatedCitIds = citId:citIds
+                updatedCarte = Map.insert coord' (batId, updatedCitIds) carte
+            in updatedCarte
+
+-- remove a citizen from the carte
+removeCitoyenFromCarte :: CitId -> Etat -> Map Coord (BatId, [CitId])
+removeCitoyenFromCarte citId etat@(Etat {carte = carte}) = 
+    let coord = getCoordCitoyen citId etat
+    in case coord of
+        Just coord' -> 
+            let (batId, citIds) = case Map.lookup coord' carte of
+                    Just x -> x
+                    Nothing -> (BatId 0, [])
+                updatedCitIds = filter (/= citId) citIds
+                updatedCarte = Map.insert coord' (batId, updatedCitIds) carte
+            in updatedCarte
+
+-- remove a citizen from the ville
+removeCitoyenFromVille :: CitId -> Etat -> Etat
+removeCitoyenFromVille citId etat@(Etat {ville = ville}) = 
     let citoyens = getCitoyens ville
-    in case Map.lookup citId citoyens of
-        Just cit -> case cit of
-            Immigrant _ _ occ -> Just occ
-            Habitant _ _ _ occ -> Just occ
-            Emigrant _ occ -> Just occ
-        Nothing -> Nothing
+        updatedCitoyens = Map.delete citId citoyens
+        updatedCarte = removeCitoyenFromCarte citId etat
+    in etat {ville = ville {viCit = updatedCitoyens} , carte = updatedCarte}
 
-
--- Move a citizen to a new coordinate
-moveCitizen :: Coord -> CitId -> Etat -> Etat
-moveCitizen newCoord citId etat@(Etat { ville = ville, carte = carte }) =
-    let
-        -- Fetch the current citizen details
-        maybeCitoyen = Map.lookup citId (viCit ville)
-        -- Fetch the current coordinates of the citizen
-        maybeCitCoord = getCoordCitoyen citId etat
-
-        -- Update the citizen's coordinates
-        updatedCitoyen = case maybeCitoyen of
-            Just citoyen -> updateCitoyenCoord citoyen newCoord
-            Nothing -> error "Citizen not found"
-
-        -- Update the citizen in the ville
-        updatedCitoyens = Map.insert citId updatedCitoyen (viCit ville)
-
-        -- Update the carte
-        updatedCarte = case maybeCitCoord of
-            Just coord -> case Map.lookup coord carte of
-                Just (batId, citIds) -> Map.insert coord (batId, filter (/= citId) citIds) carte
-                Nothing -> carte
-            Nothing -> carte
-    in etat { ville = ville { viCit = updatedCitoyens }, carte = updatedCarte }
-
--- Helper function to remove a citizen ID from a list of IDs at a coordinate
-removeCitId :: CitId -> [CitId] -> Maybe [CitId]
-removeCitId citId citIds = let newCitIds = filter (/= citId) citIds
-                           in if null newCitIds then Nothing else Just newCitIds
-
--- Helper function to update the citizen's coordinate
-updateCitoyenCoord :: Citoyen -> Coord -> Citoyen
-updateCitoyenCoord (Immigrant _ a b) coord = Immigrant coord a b
-updateCitoyenCoord (Habitant _ a b c) coord = Habitant coord a b c
-updateCitoyenCoord (Emigrant _ a) coord = Emigrant coord a

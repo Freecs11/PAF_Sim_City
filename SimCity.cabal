@@ -25,12 +25,12 @@ source-repository head
 
 library
   exposed-modules:
+      AStarPathfinding
       Batiments
       Citoyens
       Formes
       GameData
       Keyboard
-      Model
       Mouse
       Sprite
       SpriteMap

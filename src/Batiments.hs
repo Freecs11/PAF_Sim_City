@@ -20,11 +20,11 @@ import qualified Debug.Trace as T
 import qualified Data.Map as Map
 import Data.Map (Map)
 
+import Formes
+
 -- TOCHANGE
 
--- get the map of buildings from a city
-getBatiments :: Ville -> Map BatId Batiment
-getBatiments Ville { viZones = zones , viBat = batiments} = batiments
+
 
 -- check if a building is at a coordinate
 isBatimentAt :: Coord -> BatId -> Etat -> Bool
@@ -73,89 +73,63 @@ prop_carteCoordBat_inv etat@(Etat {ville = ville, carte = carte}) = let batiment
         step batId batiment acc = acc && hasBatimentAt batId etat
 
 
--- smaert constructor 
--- create a building with a unique id
-createBatiment :: BatId -> Batiment -> Etat -> Etat
-createBatiment batId batiment etat@(Etat {ville = ville}) =
-    let batiments = Map.insert batId batiment $ getBatiments ville
-    in etat {ville = ville {viBat = batiments}
-    , carte = insertBatimentInCarte batId etat
-    }
+-- -- smaert constructor 
+createBatiment :: Batiment -> Etat -> Etat
+createBatiment batiment etat@(Etat {ville = ville}) = 
+    case isBatimentValid batiment etat of
+        True -> let batiments = getBatiments ville
+                    batId = BatId (Map.size batiments)
+                    updatedBatiments = Map.insert batId batiment batiments
+                in etat {ville = ville {viBat = updatedBatiments}}
+        False -> etat
 
-    
--- remove a building from the city
-removeBatiment :: BatId -> Etat -> Etat
-removeBatiment batId etat@(Etat {ville = ville}) = 
-    let batiments = Map.delete batId $ getBatiments ville
-    in etat {ville = ville {viBat = batiments}
-    , carte = removeBatimentFromCarte batId etat
-    }
+-- buildings are valid if they are not already in the city
+-- and if they are disjoint from the buildings already in the city and also are in a zone that is a ZR, ZI or ZC
+isBatimentValid :: Batiment -> Etat -> Bool
+isBatimentValid batiment etat@(Etat {ville = ville}) = let batiments = getBatiments ville
+    in case batiment of
+        Cabane forme coord _ _ -> not (elem batiment batiments) && isBatimentDisjoint forme batiments && isBatimentInZone batiment etat
+        Atelier forme coord _ _ -> not (elem batiment batiments) && isBatimentDisjoint forme batiments && isBatimentInZone batiment etat
+        Epicerie forme coord _ _ -> not (elem batiment batiments) && isBatimentDisjoint forme batiments && isBatimentInZone batiment etat
+        Commissariat forme coord -> not (elem batiment batiments) && isBatimentDisjoint forme batiments && isBatimentInZone batiment etat
 
--- insert a building in the carte
-insertBatimentInCarte :: BatId -> Etat -> Map Coord (BatId, [CitId])
-insertBatimentInCarte batId etat@(Etat {ville = ville, carte = carte}) = 
-    let maybeCoord = getCoordBatiment batId etat
-    in case maybeCoord of
-        Just coord -> case Map.lookup coord carte of
-            Just (batId', citIds) -> 
-                if batId' == batId then carte
-                else Map.insert coord (batId, citIds) carte -- à changer , là on écrase les batiments qui sont déjà à cette coordonnée
-            Nothing -> Map.insert coord (batId, []) carte
-        Nothing -> carte
+-- check if a building is disjoint from the other buildings
+isBatimentDisjoint :: Forme -> Map BatId Batiment -> Bool
+isBatimentDisjoint forme batiments = 
+    let coords = getFormeCoord forme in 
+        foldr (\batiment acc -> case batiment of
+            Cabane forme' coord _ _ -> acc && not (appartient coord forme)
+            Atelier forme' coord _ _ -> acc && not (appartient coord forme)
+            Epicerie forme' coord _ _ -> acc && not (appartient coord forme)
+            Commissariat forme' coord -> acc && not (appartient coord forme)
+        ) True (Map.elems batiments)
 
 
--- remove a building from the carte same way as removeCitFromCarte
-removeBatimentFromCarte :: BatId -> Etat -> Map Coord (BatId, [CitId])
-removeBatimentFromCarte batId etat@(Etat {carte = carte}) = 
-    let maybeCoord = getCoordBatiment batId etat
-    in case maybeCoord of
-        Just coord -> case Map.lookup coord carte of
-            Just (batId', citIds) -> 
-                if batId' == batId then Map.delete coord carte
-                else carte
-            Nothing -> carte
-        Nothing -> carte
+
+-- check if a building is in a zone that is a ZR, ZI or ZC
+isBatimentInZone :: Batiment -> Etat -> Bool
+isBatimentInZone batiment etat@(Etat {ville = ville}) = let zones = getZones ville
+    in 
+        foldr (\zone acc -> case zone of
+            ZR forme _ -> acc || isBatimentInZone' forme batiment
+            ZI forme _ -> acc || isBatimentInZone' forme batiment
+            ZC forme _ -> acc || isBatimentInZone' forme batiment
+            _ -> acc
+        ) False (Map.elems zones)
+
+-- check if a building is in a zone
+isBatimentInZone' :: Forme -> Batiment -> Bool
+isBatimentInZone' forme batiment = appartient (getBatimentCoord batiment) forme
 
 -- get the coordinates of a building
-getCoordBatiment :: BatId -> Etat -> Maybe Coord
-getCoordBatiment batId (Etat {ville = ville}) = let batiments = getBatiments ville
-    in case Map.lookup batId batiments of
-        Just bat -> case bat of
-            Cabane _ coord _ _ -> Just coord
-            Atelier _ coord _ _ -> Just coord
-            Epicerie _ coord _ _ -> Just coord
-            Commissariat _ coord -> Just coord
+getBatimentCoord :: Batiment -> Coord
+getBatimentCoord batiment = case batiment of
+    Cabane _ coord _ _ -> coord
+    Atelier _ coord _ _ -> coord
+    Epicerie _ coord _ _ -> coord
+    Commissariat _ coord -> coord
+    
 
-        Nothing -> Nothing
-
--- get the building at a coordinate
-getBatimentAt :: Coord -> Etat -> Maybe Batiment
-getBatimentAt coord (Etat {ville = ville}) = let batiments = getBatiments ville
-    in case Map.foldrWithKey step Nothing batiments of
-        Just bat -> Just bat
-        Nothing -> Nothing
-    where
-        step :: BatId -> Batiment -> Maybe Batiment -> Maybe Batiment
-        step batId bat acc = case bat of
-            Cabane _ coord' _ _ -> if coord == coord' then Just bat else acc
-            Atelier _ coord' _ _ -> if coord == coord' then Just bat else acc
-            Epicerie _ coord' _ _ -> if coord == coord' then Just bat else acc
-            Commissariat _ coord' -> if coord == coord' then Just bat else acc
-            _ -> acc
-
--- get the last batId in the city
-getLastBatId :: Etat -> BatId
-getLastBatId (Etat {ville = ville}) = let batiments = getBatiments ville
-    in case Map.foldrWithKey step Nothing batiments of
-        Just batId -> batId
-        Nothing -> BatId 0
-    where
-        step :: BatId -> Batiment -> Maybe BatId -> Maybe BatId
-        step batId _ acc = case acc of
-            Just acc' -> if batId > acc' then Just batId else acc
-            Nothing -> Just batId
-            
-
-
-
+prop_inv_Batiment :: Etat -> Bool
+prop_inv_Batiment etat = prop_carte_coords_valid_Ville etat && prop_carteCoordBat_inv etat
 

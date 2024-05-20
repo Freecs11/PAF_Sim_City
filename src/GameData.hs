@@ -101,6 +101,15 @@ data Ville = Ville {
             }
             deriving (Show , Eq)
 
+getZones :: Ville -> Map ZonId Zone
+getZones (Ville {viZones = z}) = z
+
+getBatiments :: Ville -> Map BatId Batiment
+getBatiments (Ville {viBat = b}) = b
+
+getCitoyens :: Ville -> Map CitId Citoyen
+getCitoyens (Ville {viCit = c}) = c
+
 
 data Event = Move Coord CitId -- évenement pour déplacer un citoyen vers un Coord ( normalement celui d'un batiment)
            | StartWork CitId -- commence le travaille , va rajouté dans l'état le temps de fin de travail du citoyen comme currentTime + temps de travail
@@ -108,7 +117,14 @@ data Event = Move Coord CitId -- évenement pour déplacer un citoyen vers un Co
            | GoShopping CitId -- commence le shopping, meme principe que StartWork
            | GoHome CitId -- rentre chez lui , il signifie que le citoyen a fini son travail ou son shopping et qu'il rentre chez lui directement ( suivant le chemin le plus court)
            | UpdateNeeds CitId -- met à jour les besoins du citoyen ( du genre faim, soif, etc.  qui décroit avec le temps) , donc on va rajouter un évenement pour mettre à jour les besoins de chaque citoyen à chaque tour de boucle
+           | TaxRetreival Int -- évenement pour prélever une taxe sur les citoyens, va juste rajouter des coins à l'état
+           | FollowPath [Coord] CitId -- évenement pour faire suivre un chemin à un citoyen 
+           | Moving Coord CitId -- move déclenche le pathfinding et moving fait le mouvement
            deriving (Eq, Show)
+
+-- utilisation de la selection pour savoir si on a sélectionné un batiment ou une zone
+data Selection = ZoneType String | BuildingType String | None 
+    deriving (Show, Eq)
 
 -- on va stocker les évenements à faire à un temps donné , 
 -- ce que j'imagine c'est dans la boucle de jeu on va regarder si on a des évenements à faire à currentTime et on les fait
@@ -118,7 +134,8 @@ data Etat =  Etat {
         coins :: Int,
         carte :: Map Coord (BatId, [CitId]), -- on va stocker les batiments et les citoyens à chaque coordonnée
         currentTime :: Int , -- temps actuel du jeu , utilise un entier pour l'instant
-        events :: Map Int [Event] 
+        events :: Map Int [Event] ,
+        selection :: Selection
     }
     deriving (Show, Eq)
 

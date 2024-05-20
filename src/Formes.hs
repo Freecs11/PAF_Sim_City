@@ -5,6 +5,11 @@ import GameData
 -- formes functions and invariants/pre/post conditions
 -- instances also ( functor, applicative, monad, foldable, traversable, etc. )
 
+getFormeCoord :: Forme -> Coord
+getFormeCoord (HSegment c _) = c
+getFormeCoord (VSegment c _) = c
+getFormeCoord (Rectangle c _ _) = c
+
 
 limites :: Forme -> (Int, Int, Int, Int)
 limites (HSegment (C x y) l) = (y, y, x, x + l - 1)
@@ -132,4 +137,18 @@ prop_adjacentes_postcondition f1 f2 =
      in ((n1 == s2 || s1 == n2) && (o1 <= e2 && e1 >= o2)) ||
         ((o1 == e2 || e1 == o2) && (n1 <= s2 && s1 >= n2)))
 
+
+-- on ne voit pas trop l'intérêt de construire une forme vide 
+-- et également de construire mes VSegment et HSegment dans le fonctionnement du jeu
+-- donc le joueur pour nous va seulement construire des rectangles et 
+-- placer des batiments sur ces zones
+smartRectangleConstructer :: Coord -> Int -> Int -> Maybe Forme
+smartRectangleConstructer c w h = if w > 0 && h > 0 then Just (Rectangle c w h) else Nothing
+
+-- on pense pas utiliser ces fonctions mais bon ...
+smartVSegmentConstructer :: Coord -> Int -> Maybe Forme
+smartVSegmentConstructer c l = if l > 0 then Just (VSegment c l) else Nothing
+
+smartHSegmentConstructer :: Coord -> Int -> Maybe Forme
+smartHSegmentConstructer c l = if l > 0 then Just (HSegment c l) else Nothing
 

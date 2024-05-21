@@ -2,6 +2,8 @@ module GameData where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Control.Monad.State ( MonadState(put), MonadState(get), evalState, execState, modify, State )
+import Control.Monad (when)
 
 
 --- all the data types used in the game are defined here 

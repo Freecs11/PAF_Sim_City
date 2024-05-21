@@ -8,6 +8,17 @@ import GameData
 import Formes
 
 
+-- get all coords of routes in the city
+getRoutesCoords :: Etat -> [Coord]
+getRoutesCoords etat@(Etat {ville = ville}) = 
+    let zones = getZones ville
+    in Map.foldrWithKey step [] zones
+    where
+        step :: ZonId -> Zone -> [Coord] -> [Coord]
+        step zonId zone acc = case zone of
+            Route forme -> getFormeCoord forme : acc
+            _ -> acc
+
 
 -- check if a zone is at a coordinate
 isZoneAt :: Coord -> ZonId -> Etat -> Bool

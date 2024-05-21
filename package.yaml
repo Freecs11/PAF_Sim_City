@@ -25,6 +25,7 @@ dependencies:
 - linear
 - sdl2 
 - random
+- Monad 
 - text
 - sdl2-ttf
 - hspec

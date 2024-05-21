@@ -24,12 +24,12 @@ import TextureMap
 -- TOCHANGE
 -- récupère tous les coordonéés de tous les batiments
 getBatimentsCoords :: Etat -> [Coord]
-getBatimentsCoords Etat {ville = ville} =
-  let batiments = getBatiments ville
-   in Map.foldrWithKey step [] batiments
-  where
-    step :: BatId -> Batiment -> [Coord] -> [Coord]
-    step batId batiment acc = (getBatimentCoord batiment) : acc
+getBatimentsCoords (Etat {ville = ville}) = let batiments = getBatiments ville
+    in Map.foldrWithKey step [] batiments
+    where
+        step :: BatId -> Batiment -> [Coord] -> [Coord]
+        step batId batiment acc = (getBatimentCoord batiment) : acc
+
 
 -- check if a building is at a coordinate
 isBatimentAt :: Coord -> BatId -> Etat -> Bool

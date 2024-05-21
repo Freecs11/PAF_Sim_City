@@ -54,3 +54,7 @@ mouseButtonPressed mouse events =
 getMousePosition :: MouseState -> (Int, Int)
 getMousePosition (P (V2 x y)) = (x, y)
 
+
+-- Get the relative position of the mouse
+getMouseRel :: MouseState -> (Int, Int)
+getMouseRel  (P (V2 x y)) = (fromIntegral x, fromIntegral y)

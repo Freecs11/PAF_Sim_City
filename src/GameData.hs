@@ -143,3 +143,6 @@ data Etat =  Etat {
 
 getCarte :: Etat -> Map Coord (BatId, [CitId])
 getCarte (Etat {carte = c}) = c
+
+getBatimentsIDs :: Ville -> [BatId]
+getBatimentsIDs (Ville {viBat = b}) = Map.keys b

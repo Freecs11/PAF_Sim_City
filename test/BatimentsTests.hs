@@ -67,7 +67,8 @@ integrityTests = describe "Integrity" $ do
         \(batiments :: [(BatId, Batiment)]) -> do
             let batIds = map fst batiments
                 etat = foldl (\etat (batId, batiment) -> createBatiment batId batiment etat) 
-                             (Etat { ville = Ville Map.empty Map.empty Map.empty, coins = 0, carte = Map.empty, currentTime = 0, events = Map.empty }) 
+                             (Etat { ville = Ville Map.empty Map.empty Map.empty, coins = 0, carte = Map.empty, currentTime = 0, events = Map.empty,
+                             selection = None }) 
                              batiments
                 etat' = foldl (\etat batId -> removeBatiment batId etat) etat batIds
             all (\batId -> hasBatimentAt batId etat == hasBatimentAt batId etat') batIds 

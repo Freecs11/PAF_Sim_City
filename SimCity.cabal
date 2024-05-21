@@ -49,6 +49,7 @@ library
     , hspec
     , linear
     , mtl
+    , pqueue
     , random
     , sdl2
     , sdl2-ttf
@@ -71,6 +72,7 @@ executable minijeu-exe
     , hspec
     , linear
     , mtl
+    , pqueue
     , random
     , sdl2
     , sdl2-ttf
@@ -97,6 +99,7 @@ test-suite minijeu-test
     , hspec
     , linear
     , mtl
+    , pqueue
     , random
     , sdl2
     , sdl2-ttf

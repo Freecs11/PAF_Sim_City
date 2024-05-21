@@ -11,6 +11,17 @@ getFormeCoord (VSegment c _) = c
 getFormeCoord (Rectangle c _ _) = c
 
 
+getXY :: Coord -> (Int, Int)
+getXY (C x y) = (x, y)
+
+
+moveForme :: Coord -> Forme -> Forme
+moveForme c (HSegment _ l) = HSegment c l
+moveForme c (VSegment _ l) = VSegment c l
+moveForme c (Rectangle _ w h) = Rectangle c w h
+
+
+
 limites :: Forme -> (Int, Int, Int, Int)
 limites (HSegment (C x y) l) = (y, y, x, x + l - 1)
 limites (VSegment (C x y) l) = (y, y + l - 1, x, x)

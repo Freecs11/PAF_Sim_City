@@ -43,10 +43,12 @@ library
       src
   build-depends:
       QuickCheck
+    , ansi-terminal
     , base >=4.7 && <5
     , containers
     , hspec
     , linear
+    , mtl
     , random
     , sdl2
     , sdl2-ttf
@@ -63,10 +65,12 @@ executable minijeu-exe
   build-depends:
       QuickCheck
     , SimCity
+    , ansi-terminal
     , base >=4.7 && <5
     , containers
     , hspec
     , linear
+    , mtl
     , random
     , sdl2
     , sdl2-ttf
@@ -87,10 +91,12 @@ test-suite minijeu-test
   build-depends:
       QuickCheck
     , SimCity
+    , ansi-terminal
     , base >=4.7 && <5
     , containers
     , hspec
     , linear
+    , mtl
     , random
     , sdl2
     , sdl2-ttf

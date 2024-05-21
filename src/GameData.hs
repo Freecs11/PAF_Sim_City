@@ -143,3 +143,4 @@ data Etat =  Etat {
 
 getCarte :: Etat -> Map Coord (BatId, [CitId])
 getCarte (Etat {carte = c}) = c
+

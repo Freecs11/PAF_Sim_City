@@ -19,20 +19,38 @@ import Control.Monad (when)
 
 -- init the state
 initialiseState :: Int ->  Etat
-initialiseState coins  = Etat { 
-    ville = Ville { viZones = Map.empty, viBat = Map.empty, viCit = Map.empty },
-    coins = coins,
-    carte = Map.empty, 
-    currentTime = 0, 
-    events = Map.empty,
-    selection = BuildingType "road"
-    }
+initialiseState coins  =  Etat {
+  ville = Ville {
+    viBat = Map.singleton (BatId 1) (Epicerie (Rectangle (C 100 100) 50 50) (C 100 100) 10 []),
+    viCit = Map.empty,
+    viZones = Map.empty
+  },
+  coins = coins,
+  carte = Map.empty,
+  currentTime = 0,
+  events = Map.empty,
+  selection = None
+}
+
+    -- Etat { 
+    -- ville = Ville { viZones = Map.empty, viBat = Map.empty, viCit = Map.empty },
+    -- coins = coins,
+    -- carte = Map.empty, 
+    -- currentTime = 0, 
+    -- events = Map.empty,
+    -- selection = BuildingType "road"
+    -- }
 
 getSelectedBuilding :: Etat -> Selection
 getSelectedBuilding (Etat { selection = selection }) = selection
 
 getTime :: Etat -> Int
 getTime (Etat { currentTime = time }) = time
+
+getTimeMonad :: State Etat Int
+getTimeMonad = do
+    state <- get
+    return $ currentTime state
 
 
 -- menu :: IO (Map.Map String (Int, Int, Int))

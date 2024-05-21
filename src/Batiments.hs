@@ -25,7 +25,7 @@ import Formes
 -- TOCHANGE
 -- récupère tous les coordonéés de tous les batiments
 getBatimentsCoords :: Etat -> [Coord]
-getBatimentCoords etat@{ville = ville} = let batiments = getBatiments ville
+getBatimentsCoords (Etat {ville = ville}) = let batiments = getBatiments ville
     in Map.foldrWithKey step [] batiments
     where
         step :: BatId -> Batiment -> [Coord] -> [Coord]

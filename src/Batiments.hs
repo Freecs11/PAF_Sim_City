@@ -11,6 +11,7 @@ import qualified Debug.Trace as T
 import Foreign.C.Types (CInt)
 import Formes
 import GameData
+import GameData (Batiment)
 import SDL
 import SDL (Point (..), Rectangle (..), V4 (..))
 import qualified SDL
@@ -24,23 +25,19 @@ import TextureMap
 -- TOCHANGE
 -- récupère tous les coordonéés de tous les batiments
 getBatimentsCoords :: Etat -> [Coord]
-getBatimentsCoords (Etat {ville = ville}) = let batiments = getBatiments ville
-    in Map.foldrWithKey step [] batiments
-    where
-        step :: BatId -> Batiment -> [Coord] -> [Coord]
-        step batId batiment acc = (getBatimentCoord batiment) : acc
-
+getBatimentsCoords (Etat {ville = ville}) =
+  let batiments = getBatiments ville
+   in Map.foldrWithKey step [] batiments
+  where
+    step :: BatId -> Batiment -> [Coord] -> [Coord]
+    step batId batiment acc = (getBatimentCoord batiment) : acc
 
 -- check if a building is at a coordinate
 isBatimentAt :: Coord -> BatId -> Etat -> Bool
 isBatimentAt coord batId (Etat {ville = ville}) =
   let batiments = getBatiments ville
    in case Map.lookup batId batiments of
-        Just batiment -> case batiment of
-          Cabane forme coord' _ _ -> coord == coord'
-          Atelier forme coord' _ _ -> coord == coord'
-          Epicerie forme coord' _ _ -> coord == coord'
-          Commissariat forme coord' -> coord == coord'
+        Just batiment -> (getBatimentCoord batiment) == coord
         Nothing -> False
 
 -- verify if the Coord and BatId of the state are coherent
@@ -81,15 +78,18 @@ prop_carteCoordBat_inv etat@(Etat {ville = ville, carte = carte}) =
     step batId batiment acc = acc && hasBatimentAt batId etat
 
 -- -- smaert constructor
-createBatiment :: Batiment -> Etat -> Etat
+createBatiment :: Batiment -> Etat -> (Etat, BatId)
 createBatiment batiment etat@(Etat {ville = ville}) =
   case isBatimentValid batiment etat of
     True ->
       let batiments = getBatiments ville
           batId = BatId (Map.size batiments)
           updatedBatiments = Map.insert batId batiment batiments
-       in etat {ville = ville {viBat = updatedBatiments}}
-    False -> etat
+          batCoord = getBatimentCoord batiment
+       in case Map.lookup batCoord (carte etat) of
+            Just (batId', _) -> (etat, batId')
+            Nothing -> (etat {ville = ville {viBat = updatedBatiments}, carte = Map.insert batCoord (batId, []) (carte etat)}, batId)
+    False -> (etat, BatId 0)
 
 -- buildings are valid if they are not already in the city
 -- and if they are disjoint from the buildings already in the city and also are in a zone that is a ZR, ZI or ZC
@@ -144,3 +144,22 @@ getBatimentCoord batiment = case batiment of
 
 prop_inv_Batiment :: Etat -> Bool
 prop_inv_Batiment etat = prop_carte_coords_valid_Ville etat && prop_carteCoordBat_inv etat
+
+-- remove a building from the city
+removeBatiment :: BatId -> Etat -> Etat
+removeBatiment batiment etat@(Etat {ville = ville}) =
+  let batiments = getBatiments ville
+      updatedBatiments = Map.delete batiment batiments
+   in etat {ville = ville {viBat = updatedBatiments}}
+
+-- get coords of bat from batId
+getBatimentCoordFromBatId :: BatId -> Etat -> Maybe Coord
+getBatimentCoordFromBatId batId etat@(Etat {ville = ville}) =
+  let batiments = getBatiments ville
+   in case Map.lookup batId batiments of
+        Just batiment -> Just (getBatimentCoord batiment)
+        Nothing -> Nothing
+
+getBatimentCoordMaybe :: Maybe Batiment -> Maybe Coord
+getBatimentCoordMaybe (Just batiment) = Just (getBatimentCoord batiment)
+getBatimentCoordMaybe Nothing = Nothing

@@ -14,29 +14,21 @@ import qualified Data.Set as Set
 import Formes
 import GameData
 
--- init the state
-initialiseState :: Int ->  Etat
-initialiseState coins  =  Etat {
+-- Initialize game state with one building (TESTING)
+initialiseStateWithBuilding :: Int -> Etat 
+initialiseStateWithBuilding startCoins = Etat {
   ville = Ville {
-    viBat = Map.singleton (BatId 1) (Epicerie (Rectangle (C 100 100) 50 50) (C 100 100) 10 []),
+    viBat = Map.singleton (BatId 1) (Epicerie (GameData.Rectangle (C 100 100) 50 50) (C 100 100) 10 []),
     viCit = Map.empty,
     viZones = Map.empty
   },
-  coins = coins,
+  coins = startCoins,
   carte = Map.empty,
   currentTime = 0,
   events = Map.empty,
-  selection = None
+  selection = None,
+  world = World { worldOffset = C 0 0 }
 }
-
-    -- Etat { 
-    -- ville = Ville { viZones = Map.empty, viBat = Map.empty, viCit = Map.empty },
-    -- coins = coins,
-    -- carte = Map.empty, 
-    -- currentTime = 0, 
-    -- events = Map.empty,
-    -- selection = BuildingType "road"
-    -- }
 
 getSelectedBuilding :: Etat -> Selection
 getSelectedBuilding (Etat {selection = selection}) = selection

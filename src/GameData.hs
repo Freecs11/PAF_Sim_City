@@ -128,6 +128,13 @@ data Event = Move Coord CitId -- évenement pour déplacer un citoyen vers un Co
 data Selection = ZoneType String | BuildingType String | None 
     deriving (Show, Eq)
 
+
+-- world offset pour déplacer la carte (différencé les coords de la carte et les coords de l'écran)
+data World = World {
+  worldOffset :: Coord
+} deriving (Show, Eq)
+
+
 -- on va stocker les évenements à faire à un temps donné , 
 -- ce que j'imagine c'est dans la boucle de jeu on va regarder si on a des évenements à faire à currentTime et on les fait
 -- et on les enlève de la liste des évenements
@@ -137,7 +144,8 @@ data Etat =  Etat {
         carte :: Map Coord (BatId, [CitId]), -- on va stocker les batiments et les citoyens à chaque coordonnée
         currentTime :: Int , -- temps actuel du jeu , utilise un entier pour l'instant
         events :: Map Int [Event] ,
-        selection :: Selection
+        selection :: Selection,
+        world :: World
     }
     deriving (Show, Eq)
 

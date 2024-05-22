@@ -26,7 +26,7 @@ import qualified Mouse as Ms
 import qualified Debug.Trace as T
 import Data.Text (pack)
 import qualified GameData as GameData
-import GameData (getCarte, Coord (..), Batiment (..), ZonId (..), BatId (..), CitId (..) , Citoyen (..), Zone (..), Ville (..) , Etat (..) , Selection (..))
+import GameData (getCarte, Coord (..), Batiment (..), ZonId (..), BatId (..), CitId (..) , Citoyen (..), Zone (..), Ville (..) , Etat (..) , Selection (..) , World(..))
 import qualified State as State 
 import Data.Word (Word8)
 import Control.Monad.State (execState, runState, State, modify, get, put, evalState)
@@ -40,25 +40,19 @@ windowsWidth = 1280
 
 windowsHeight :: CInt
 windowsHeight = 680
+
+tailleBloc :: CInt
+tailleBloc = 50
+
+RouteFormeHoriz :: Coord -> Forme
+RouteFormeHoriz x = HSegment x  50
+
+RouteFormeVert :: Coord -> Forme
+RouteFormeVert x = VSegment x  50
+
+
 -- TO BE MODIFIED --------------------------------------------------------------
 
--- Function to render all buildings
-renderBuildings :: Renderer -> TextureMap -> SpriteMap -> Ville -> IO ()
-renderBuildings renderer tmap smap ville = do
-  let buildings = Map.elems $ viBat ville
-  mapM_ (renderBuilding renderer tmap smap) buildings
-
--- Helper function to render a single building
-renderBuilding :: Renderer -> TextureMap -> SpriteMap -> Batiment -> IO ()
-renderBuilding renderer tmap smap building = do
-  let (coord, spriteId) = case building of
-        Cabane _ coord _ _      -> (coord, SpriteId "Cabane")
-        Atelier _ coord _ _     -> (coord, SpriteId "Atelier")
-        Epicerie _ coord _ _    -> (coord, SpriteId "Epicerie")
-        Commissariat _ coord    -> (coord, SpriteId "Commissariat")
-  let sprite = SM.fetchSprite spriteId smap
-  let (x , y ) = getXY coord
-  S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral x) (fromIntegral y))
 
 loadBackground :: Renderer -> FilePath -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
 loadBackground rdr path tmap smap = do
@@ -131,23 +125,28 @@ getTextureId :: Sprite -> TextureId
 getTextureId sprite = case S.currentImage sprite of
   S.Image tid _ -> tid
 
--- Initialize game state with one building
-initialiseStateWithBuilding :: Int -> Etat
-initialiseStateWithBuilding startCoins = Etat {
-  ville = Ville {
-    viBat = Map.singleton (BatId 1) (Epicerie (GameData.Rectangle (C 100 100) 50 50) (C 100 100) 10 []),
-    viCit = Map.empty,
-    viZones = Map.empty
-  },
-  coins = startCoins,
-  carte = Map.empty,
-  currentTime = 0,
-  events = Map.empty,
-  selection = None
-}
 
-tailleBloc :: CInt
-tailleBloc = 50
+
+-- Adjust for world offset
+applyOffset :: Coord -> Coord -> Coord
+applyOffset (C x y) (C dx dy) = C (x + dx) (y + dy)
+
+renderBuildings :: Renderer -> TextureMap -> SpriteMap -> Ville -> Coord -> IO ()
+renderBuildings renderer tmap smap ville offset = do
+  let buildings = Map.elems $ viBat ville
+  mapM_ (renderBuilding renderer tmap smap offset) buildings
+
+renderBuilding :: Renderer -> TextureMap -> SpriteMap -> Coord -> Batiment -> IO ()
+renderBuilding renderer tmap smap offset building = do
+  let (coord, spriteId) = case building of
+        Cabane _ coord _ _      -> (coord, SpriteId "Cabane")
+        Atelier _ coord _ _     -> (coord, SpriteId "Atelier")
+        Epicerie _ coord _ _    -> (coord, SpriteId "Epicerie")
+        Commissariat _ coord    -> (coord, SpriteId "Commissariat")
+  let sprite = SM.fetchSprite spriteId smap
+  let (x , y ) = getXY $ applyOffset coord offset
+  S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral x) (fromIntegral y))
+
 
 loadElement :: Renderer -> FilePath -> String -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
 loadElement rdr path id tmap smap = do
@@ -181,7 +180,7 @@ main = do
   let startCoins = 3000
   let taxesCitizens = 100
   -- initialisation de l'état du jeu , batiment selectionné par défaut est les routes
-  let gameState0 = initialiseStateWithBuilding startCoins
+  let gameState0 = State.initialiseStateWithBuilding startCoins
 
   let retrEvent = GameData.TaxRetreival taxesCitizens 
   -- on schedule un évenement pour prélever des taxes sur les citoyens tous les 1000000 unités de temps  
@@ -215,26 +214,27 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
   let kbd' = K.handleEvents events kbd
   let mouse' = Ms.handleMouseEvents events mouse  -- Update mouse state based on events
 
+  let gameStateW = moveWorld kbd' gameState
+
   clear renderer
 
   let selectedBuilding = case State.getSelectedBuilding gameState of
                             BuildingType building -> building
                             ZoneType zone -> zone
                             None -> "None"
-  -- display the selected building on the screen top left
+  -- Display the selected building on the screen top left
   S.displayText renderer font ("Selected building: " <> pack selectedBuilding) (V2 3 5) (V4 255 255 255 255)
 
-  -- display menu
+  
+
+  -- Render buildings with world offset
+  renderBuildings renderer tmap smap (ville gameStateW) (worldOffset $ world gameStateW)
+
+  -- Display menu
   renderMenuItems renderer font menuItems
-
-  -- display zones menu
+  -- Display zones menu
   renderZonesMenuItems renderer font zonesMenuItems
-
-  -- render buildings
-  renderBuildings renderer tmap smap (ville gameState)
-
-  let gameStateW = moveWorld kbd' gameState
-
+  
   let isKeyPressed = K.keypressed KeycodeZ kbd'
   when isKeyPressed $ putStrLn "Z key pressed"
 
@@ -252,7 +252,6 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
 
   putStrLn $ "Selected building: " <> currentSelectedBuilding
 
-
   -- Check if a building needs to be created
   gameState'' <- createBuildingIfNeeded currentSelectedBuilding mouse' events gameStateW menuItems
 
@@ -261,19 +260,26 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
         State.processEvents (State.getTime gameState'')
         State.updateSelectedBuilding currentSelectedBuilding
         ) gameState''
-  
+
   unless (K.keypressed KeycodeEscape kbd') (gameLoop frameRate renderer tmap smap kbd' gameState' mouse' font updatedMenuItems zonesMenuItems)
+
 
 createBuildingIfNeeded :: String -> MouseState -> [Event] -> Etat -> Map.Map String (Int, Int, Int) -> IO Etat
 createBuildingIfNeeded selectedBuilding mouseEvent events gameState menuItems =
     if Ms.mouseButtonPressed mouseEvent events
         then do
             let (x, y) = Ms.getMousePosition mouseEvent
+            let offset = worldOffset $ world gameState
+            let gameCoord = applyOffset (C (fromIntegral x) (fromIntegral y)) (negateCoord offset)
             let isOutsideMenu = not $ any (\(_, (_, mx, my)) -> isMouseOverMenuItem (x, y) (mx, my, 100)) (Map.toList menuItems)
             if isOutsideMenu
-                then return $ execState (createBuilding selectedBuilding (C (fromIntegral x) (fromIntegral y))) gameState
+                then return $ execState (createBuilding selectedBuilding gameCoord) gameState
                 else return gameState
         else return gameState
+
+negateCoord :: Coord -> Coord
+negateCoord (C x y) = C (-x) (-y)
+
 
 createBuilding :: String -> Coord -> State Etat ()
 createBuilding "Cabane" coord = do
@@ -322,22 +328,10 @@ moveWorld :: Keyboard -> Etat -> Etat
 moveWorld kbd etat = 
     let dx = if K.keypressed KeycodeD kbd then 10 else if K.keypressed KeycodeQ kbd then -10 else 0
         dy = if K.keypressed KeycodeS kbd then 10 else if K.keypressed KeycodeZ kbd then -10 else 0
-    in moveBuildings etat (C dx dy)
+        offset = worldOffset (world etat)
+        newOffset = applyOffset offset (C dx dy)
+    in etat { world = (world etat) { worldOffset = newOffset } }
 
-moveBuildings :: Etat -> Coord -> Etat
-moveBuildings etat (C dx dy) = 
-    let villeBat' = Map.map (\b -> moveBuilding b (C dx dy)) (viBat (ville etat))
-        ville' = (ville etat) { viBat = villeBat' }
-    in etat { ville = ville'  , carte = (updateCarteWorldMoving ville' etat) }
-moveBuilding :: Batiment -> Coord -> Batiment
-moveBuilding (Cabane f c p cit) (C dx dy) = Cabane f (C (x + dx) (y + dy)) p cit
-    where (C x y) = c
-moveBuilding (Atelier f c p cit) (C dx dy) = Atelier f (C (x + dx) (y + dy)) p cit
-    where (C x y) = c
-moveBuilding (Epicerie f c p cit) (C dx dy) = Epicerie f (C (x + dx) (y + dy)) p cit
-    where (C x y) = c
-moveBuilding (Commissariat f c) (C dx dy) = Commissariat f (C (x + dx) (y + dy))
-    where (C x y) = c
 
 
 

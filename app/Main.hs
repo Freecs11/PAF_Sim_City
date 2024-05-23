@@ -72,7 +72,7 @@ loadBackground rdr path tmap smap = do
 loadPerso :: Renderer -> FilePath -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
 loadPerso rdr path tmap smap = do
   tmap' <- TM.loadTexture rdr path (TextureId "perso") tmap
-  let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage (TextureId "perso") (S.mkArea 0 0 100 100)
+  let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage (TextureId "perso") (S.mkArea 0 0 20 20)
   let smap' = SM.addSprite (SpriteId "perso") sprite smap
   return (tmap', smap')
 
@@ -151,7 +151,7 @@ renderBackgroundMap :: Renderer -> TextureMap -> SpriteMap -> Coord -> IO ()
 renderBackgroundMap renderer tmap smap offset = do
   let sprite = SM.fetchSprite (SpriteId "grass") smap
   let (x, y) = getXY offset
-  S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral x) (fromIntegral y))
+  S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral (x-4000)) (fromIntegral (y -4000)))
 
 renderBuildings :: Renderer -> TextureMap -> SpriteMap -> Ville -> Coord -> IO ()
 renderBuildings renderer tmap smap ville offset = do
@@ -206,8 +206,13 @@ main = do
   let gameState0 = State.initialiseStateWithBuilding startCoins
 
   let retrEvent = GameData.TaxRetreival taxesCitizens
+  let placeRout = GameData.PlaceRoute (C 107 255) 
+  let cit1GowORK = GameData.GoWork (CitId (show 1))
   -- on schedule un évenement pour prélever des taxes sur les citoyens tous les 1000000 unités de temps
-  let gameState = execState (State.scheduleEvent 1000 retrEvent) gameState0
+  let gameState = execState ( do 
+        State.scheduleEvent 1000 retrEvent
+        State.scheduleEvent 2000 placeRout
+        State.scheduleEvent 3000 cit1GowORK ) gameState0
 
   -- initialisation de l'état du clavier
   let kbd = K.createKeyboard
@@ -257,6 +262,12 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
   -- display number of citizens on the screen top left
   S.displayText renderer font ("Citizens: " <> pack (show sizeCitizens)) (V2 3 35) (V4 255 255 255 255)
 
+  -- display current time on the screen bottom left
+  S.displayText renderer font ("Time: " <> pack (show $ currentTime gameStateW)) (V2 3 50) (V4 255 255 255 255)
+
+  -- print first citizen
+  printFirstCitizen gameStateW
+
   -- let isKeyPressed = K.keypressed KeycodeZ kbd'
   -- when isKeyPressed $ putStrLn "Z key pressed"
   -- Toggle route direction when key R is pressed
@@ -272,6 +283,8 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
   renderBuildings renderer tmap smap (ville gameStateW) (worldOffset $ world gameStateW)
   -- Render zones with world offset
   renderZones renderer (ville gameStateW) (worldOffset $ world gameStateW)
+  -- Render citizens with world offset
+  renderCitizens renderer tmap smap (ville gameStateW) (worldOffset $ world gameStateW)
   -- Display menu
   renderMenuItems renderer font menuItems
   -- Display zones menu
@@ -297,14 +310,18 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
   -- Spawn citizens
   gameStateCitizens <- spawnCitizens gameState''
 
+  let updateEvent = GameData.UpdateCitizens
+  -- scheduleEvent
+  let gameStateWithEvent = execState (State.scheduleEvent (State.getTime gameStateW + 10) updateEvent) gameStateCitizens
   -- Update game state using State monad
   let gameState' =
         execState
           ( do
-              State.processEvents (State.getTime gameStateCitizens)
+              State.processEvents (State.getTime gameStateWithEvent)
               State.updateSelectedBuilding currentSelectedBuilding
+              State.scheduleEvent (State.getTime gameStateWithEvent + 10) GameData.AssignBuildingstoCitizens
           )
-          gameStateCitizens
+          gameStateWithEvent
   unless (K.keypressed KeycodeEscape kbd') (gameLoop frameRate renderer tmap smap kbd' gameState' {currentTime = (currentTime gameState') + 1} mouse' font updatedMenuItems zonesMenuItems)
 
 toggleRouteDirection :: Etat -> Etat
@@ -555,7 +572,7 @@ spawnCitizensForHome batId coord maxCitizens ctz etat =
   if length ctz >= maxCitizens
     then (ctz, etat)
     else
-      let citoyen = Habitant coord (100, 100, 100) (batId, Nothing, Nothing) GameData.Dormir
+      let citoyen = Habitant coord (10, 10, 10) (batId, Nothing, Nothing) GameData.Dormir
           (etatN, citId) = createCitoyen citoyen etat
        in spawnCitizensForHome batId coord (maxCitizens - 1) (ctz ++ [citId]) etatN
 
@@ -568,3 +585,51 @@ getHomes batiments =
         _ -> False
     )
     (Map.toList batiments)
+
+
+-- | Check if a citizen is at one of their buildings (home, shop, work)
+isCitizenAtBuilding :: Citoyen -> Map.Map BatId Batiment -> Bool
+isCitizenAtBuilding (Habitant _ _ (homeId, mWorkId, mShopId) _) batiments =
+  let home = Map.lookup homeId batiments
+      work = case mWorkId of
+        Just workId -> Map.lookup workId batiments
+        Nothing -> Nothing
+      shop = case mShopId of
+        Just shopId -> Map.lookup shopId batiments
+        Nothing -> Nothing
+   in case (home, work, shop) of
+        (Just (Cabane _ _ _ _), Just (Atelier _ _ _ _), Just (Epicerie _ _ _ _)) -> True
+        _ -> False
+isCitizenAtBuilding _ _ = False
+
+
+-- Render citizens on the screen
+renderCitizens :: Renderer -> TextureMap -> SpriteMap -> Ville -> Coord -> IO ()
+renderCitizens renderer tmap smap ville offset = do
+  let citoyens = Map.elems $ viCit ville
+  let batiments = viBat ville
+  mapM_ (renderCitizen renderer tmap smap offset batiments) citoyens
+
+renderCitizen :: Renderer -> TextureMap -> SpriteMap -> Coord -> Map.Map BatId Batiment -> Citoyen -> IO ()
+renderCitizen renderer tmap smap offset batiments citoyen = do
+  -- unless (isCitizenAtBuilding citoyen batiments) $ do
+    let (coord, spriteId) = case citoyen of
+          Habitant coord _ _ _ -> (coord, SpriteId "perso")  -- Use a default sprite for citizen
+          _ -> (C 0 0, SpriteId "perso")
+    let sprite = SM.fetchSprite spriteId smap
+    let (x, y) = getXY $ applyOffset coord offset
+    S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral x) (fromIntegral y))
+
+
+
+
+  
+
+printFirstCitizen :: Etat -> IO ()
+printFirstCitizen etat = do
+  let citoyens = viCit $ ville etat
+  if Map.null citoyens
+    then return ()
+    else do
+      let firstCitizen = head $ Map.elems citoyens
+      putStrLn $ show firstCitizen

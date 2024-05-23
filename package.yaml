@@ -43,7 +43,6 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
-      - -optl-mconsole
     dependencies:
       - SimCity
 
@@ -55,6 +54,5 @@ tests:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
-      - -optl-mconsole
     dependencies:
       - SimCity

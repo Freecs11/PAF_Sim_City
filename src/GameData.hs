@@ -65,7 +65,7 @@ instance Ord CitId where
 
 -- Batiment data type
 data Batiment
-  = Cabane Forme Coord Int [CitId]
+  = Cabane Forme Coord Int [CitId] 
   | Atelier Forme Coord Int [CitId]
   | Epicerie Forme Coord Int [CitId]
   | Commissariat Forme Coord
@@ -75,10 +75,10 @@ data Batiment
 data Zone
   = Eau Forme
   | Route Forme
-  | ZR Forme [BatId]
-  | ZI Forme [BatId]
-  | ZC Forme [BatId]
-  | Admin Forme BatId
+  | ZR Forme [BatId] 
+  | ZI Forme [BatId] 
+  | ZC Forme [BatId] 
+  | Admin Forme BatId 
   deriving (Show, Eq)
 
 -- MAP BATIMENT to BATid
@@ -125,6 +125,7 @@ data Event
   | FollowPath [Coord] CitId -- évenement pour faire suivre un chemin à un citoyen
   | Moving Coord CitId -- move déclenche le pathfinding et moving fait le mouvement
   | AssignBuildingstoCitizens -- assigne les batiments aux citoyens ( leurs travail, magasin) , la maison est déjà assignée à la création du citoyen
+  | PlaceRoute Coord  -- place une route à la coordonnée donnée
   deriving (Eq, Show)
 
 -- utilisation de la selection pour savoir si on a sélectionné un batiment ou une zone

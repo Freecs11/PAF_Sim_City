@@ -18,27 +18,28 @@ import GameData (CitId (CitId))
 
 -- Initialize game state with one building (TESTING)
 initialiseStateWithBuilding :: Int -> Etat
-initialiseStateWithBuilding startCoins = Etat {
-  -- ville = Ville {
-  --   viBat = Map.singleton (BatId 1) (Epicerie (GameData.Rectangle (C 100 100) 50 50) (C 100 100) 10 []),
-  --   viCit = Map.empty,
-  --   viZones = Map.singleton (ZonId 1) (Route (GameData.Rectangle (C 110 110) 10 120))
-  -- },
-  ville = Ville {
-    viBat = Map.empty,
-    viCit = Map.empty,
-    viZones = Map.empty
-  },
-  coins = startCoins,
-  carte = Map.empty,
-  currentTime = 0,
-  events = Map.empty,
-  selection = None,
-  world = World { worldOffset = C 0 0 },
-  routeDirection = Horizontal,
-  selectionStart = Nothing
-}
-
+initialiseStateWithBuilding startCoins =
+  Etat
+    { -- ville = Ville {
+      --   viBat = Map.singleton (BatId 1) (Epicerie (GameData.Rectangle (C 100 100) 50 50) (C 100 100) 10 []),
+      --   viCit = Map.empty,
+      --   viZones = Map.singleton (ZonId 1) (Route (GameData.Rectangle (C 110 110) 10 120))
+      -- },
+      ville =
+        Ville
+          { viBat = Map.empty,
+            viCit = Map.empty,
+            viZones = Map.empty
+          },
+      coins = startCoins,
+      carte = Map.empty,
+      currentTime = 0,
+      events = Map.empty,
+      selection = None,
+      world = World {worldOffset = C 0 0},
+      routeDirection = Horizontal,
+      selectionStart = Nothing
+    }
 
 getSelectedBuilding :: Etat -> Selection
 getSelectedBuilding (Etat {selection = selection}) = selection
@@ -116,7 +117,6 @@ processEvent event = case event of
   TaxRetreival amount -> taxRetreival amount
   AssignBuildingstoCitizens -> assignBuildingstoCitizens
   _ -> return ()
-  
 
 -- fonction pour géré la taxe sur les citoyens
 -- elle collecte une taxe sur chaque citoyen de la ville et l'ajoute à la caisse de la ville ( les coins du joueur)
@@ -307,8 +307,6 @@ updateCitizenCoord newCoord (Immigrant _ stats occ) = Immigrant newCoord stats o
 updateCitizenCoord newCoord (Habitant _ stats b occ) = Habitant newCoord stats b occ
 updateCitizenCoord newCoord (Emigrant _ occ) = Emigrant newCoord occ
 
-
-
 -- Assign citizens to buildings
 -- assign to Habitants their work, and their shopping destination if possible
 assignBuildingstoCitizens :: State Etat ()
@@ -318,39 +316,63 @@ assignBuildingstoCitizens = do
   let batiments = getBatiments (ville state) -- Map BatId Batiment
 
   -- assign work to Habitants (if they don't have one already)
-  let habitants = Map.filter (\cit -> case cit of
-        Habitant _ _ _ _ -> True
-        _ -> False) citoyens 
+  let habitants =
+        Map.filter
+          ( \cit -> case cit of
+              Habitant _ _ _ _ -> True
+              _ -> False
+          )
+          citoyens
   let habitantIds = Map.keys habitants
-  let workBatIds = Map.keys $ Map.filter (\bat -> case bat of
-        Atelier _ _ _ _ -> True
-        _ -> False) batiments
+  let workBatIds =
+        Map.keys $
+          Map.filter
+            ( \bat -> case bat of
+                Atelier _ _ _ _ -> True
+                _ -> False
+            )
+            batiments
   let workBatIds' = cycle workBatIds
   let habitantWorkAssignments = zip habitantIds workBatIds'
 
-  let newCitoyensWithWork = foldr (\ (citId, batId) acc ->
-          case Map.lookup citId acc of
-            Just (Habitant coord stats (home , _,shop) occ) -> Map.insert citId (Habitant coord stats (home, Just batId, shop) occ) acc
-            _ -> acc) citoyens habitantWorkAssignments
+  let newCitoyensWithWork =
+        foldr
+          ( \(citId, batId) acc ->
+              case Map.lookup citId acc of
+                Just (Habitant coord stats (home, _, shop) occ) -> Map.insert citId (Habitant coord stats (home, Just batId, shop) occ) acc
+                _ -> acc
+          )
+          citoyens
+          habitantWorkAssignments
 
   -- assign shopping destinations to Habitants (if they don't have one already)
-  let habitants' = Map.filter (\cit -> case cit of
-        Habitant _ _ _ _ -> True
-        _ -> False ) newCitoyensWithWork
+  let habitants' =
+        Map.filter
+          ( \cit -> case cit of
+              Habitant _ _ _ _ -> True
+              _ -> False
+          )
+          newCitoyensWithWork
   let habitantIds' = Map.keys habitants'
-  let shoppingBatIds = Map.keys $ Map.filter (\bat -> case bat of
-        Epicerie _ _ _ _ -> True
-        _ -> False ) batiments
+  let shoppingBatIds =
+        Map.keys $
+          Map.filter
+            ( \bat -> case bat of
+                Epicerie _ _ _ _ -> True
+                _ -> False
+            )
+            batiments
   let shoppingBatIds' = cycle shoppingBatIds
   let habitantShoppingAssignments = zip habitantIds' shoppingBatIds'
 
-  let newCitoyensWithShopping = foldr (
-        \ (citId, batId) acc ->
-          case Map.lookup citId acc of
-            Just (Habitant coord stats (home,work,shop) occ) -> Map.insert citId (Habitant coord stats (home,work,Just batId) occ) acc
-            _ -> acc ) newCitoyensWithWork habitantShoppingAssignments
+  let newCitoyensWithShopping =
+        foldr
+          ( \(citId, batId) acc ->
+              case Map.lookup citId acc of
+                Just (Habitant coord stats (home, work, shop) occ) -> Map.insert citId (Habitant coord stats (home, work, Just batId) occ) acc
+                _ -> acc
+          )
+          newCitoyensWithWork
+          habitantShoppingAssignments
 
-  put $ state { ville = (ville state) { viCit = newCitoyensWithShopping } }
-
-
-  
+  put $ state {ville = (ville state) {viCit = newCitoyensWithShopping}}

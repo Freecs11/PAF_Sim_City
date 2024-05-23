@@ -78,16 +78,15 @@ prop_carteCoordBat_inv etat@(Etat {ville = ville, carte = carte}) =
     step batId batiment acc = acc && hasBatimentAt batId etat
 
 -- -- smaert constructor
-createBatiment :: Batiment -> Int -> Etat  -> Etat
-createBatiment batiment cost etat@(Etat {ville = ville})  =
+createBatiment :: Batiment -> Int -> Etat -> (Etat, BatId)
+createBatiment batiment cost etat@(Etat {ville = ville}) =
   case isBatimentValid batiment etat of
     True ->
       let batiments = getBatiments ville
           batId = BatId (Map.size batiments + 1)
           updatedBatiments = Map.insert batId batiment batiments
-       in etat {ville = ville {viBat = updatedBatiments} , coins = (coins etat) - cost}
-    False -> etat
-
+       in (etat {ville = ville {viBat = updatedBatiments}, coins = (coins etat) - cost}, batId)
+    False -> (etat, BatId 0)
 
 -- buildings are valid if they are not already in the city
 -- and if they are disjoint from the buildings already in the city and also are in a zone that is a ZR, ZI or ZC
@@ -100,7 +99,6 @@ isBatimentValid batiment etat@(Etat {ville = ville}) =
         Epicerie forme coord _ _ -> not (elem batiment batiments) && isBatimentDisjoint forme batiments && isBatimentInZone batiment etat
         Commissariat forme coord -> not (elem batiment batiments) && isBatimentDisjoint forme batiments && isBatimentInZone batiment etat
 
-
 -- check if a building is disjoint from the other buildings
 isBatimentDisjoint :: Forme -> Map BatId Batiment -> Bool
 isBatimentDisjoint forme batiments =
@@ -110,7 +108,6 @@ isBatimentDisjoint forme batiments =
         )
         True
         (Map.elems batiments)
-
 
 -- check if a building is in a zone that is a ZR, ZI or ZC
 isBatimentInZone :: Batiment -> Etat -> Bool
@@ -130,7 +127,6 @@ isBatimentInZone batiment etat@(Etat {ville = ville}) =
 isBatimentInZone' :: Forme -> Batiment -> Bool
 isBatimentInZone' forme batiment = all (\coord -> appartient coord forme) (getCoords (getFormeBatiment batiment))
 
-
 -- get the coordinates of a building
 getBatimentCoord :: Batiment -> Coord
 getBatimentCoord batiment = case batiment of
@@ -142,19 +138,36 @@ getBatimentCoord batiment = case batiment of
 prop_inv_Batiment :: Etat -> Bool
 prop_inv_Batiment etat = prop_carte_coords_valid_Ville etat && prop_carteCoordBat_inv etat
 
-
 getFormeBatiment :: Batiment -> Forme
 getFormeBatiment (Cabane forme _ _ _) = forme
 getFormeBatiment (Atelier forme _ _ _) = forme
 getFormeBatiment (Epicerie forme _ _ _) = forme
 getFormeBatiment (Commissariat forme _) = forme
 
-
 -- update a building
 updateBatiment :: Batiment -> BatId -> Etat -> Etat
 updateBatiment batiment batId etat =
-    let ville' = ville etat
-        batiments = getBatiments ville'
-        updatedBatiments = Map.insert batId batiment batiments
-        updatedVille = ville' { viBat = updatedBatiments }
-    in etat { ville = updatedVille }
+  let ville' = ville etat
+      batiments = getBatiments ville'
+      updatedBatiments = Map.insert batId batiment batiments
+      updatedVille = ville' {viBat = updatedBatiments}
+   in etat {ville = updatedVille}
+
+-- get coords of bat from batId
+getBatimentCoordFromBatId :: BatId -> Etat -> Maybe Coord
+getBatimentCoordFromBatId batId etat@(Etat {ville = ville}) =
+  let batiments = getBatiments ville
+   in case Map.lookup batId batiments of
+        Just batiment -> Just (getBatimentCoord batiment)
+        Nothing -> Nothing
+
+getBatimentCoordMaybe :: Maybe Batiment -> Maybe Coord
+getBatimentCoordMaybe (Just batiment) = Just (getBatimentCoord batiment)
+getBatimentCoordMaybe Nothing = Nothing
+
+-- remove a building from the city
+removeBatiment :: BatId -> Etat -> Etat
+removeBatiment batiment etat@(Etat {ville = ville}) =
+  let batiments = getBatiments ville
+      updatedBatiments = Map.delete batiment batiments
+   in etat {ville = ville {viBat = updatedBatiments}}

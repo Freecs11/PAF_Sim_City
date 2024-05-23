@@ -44,9 +44,9 @@ creationAndLocationTests = do
     let routes = Route (Rectangle (C 0 0) 10 10)
         zones = Map.fromList [(ZonId 0, routes)]
         ville = Ville Map.empty Map.empty zones
-        etat = Etat {ville = ville, coins = 0, carte = Map.empty, currentTime = 0, events = Map.empty, selection = None}
+        etat = Etat {ville = ville, coins = 100, carte = Map.empty, currentTime = 0, events = Map.empty, selection = None}
         batiment = Cabane (Rectangle (C 0 0) 5 5) (C 0 0) 10 []
-        (newEtat, batId) = createBatiment batiment etat
+        (newEtat, batId) = createBatiment batiment 80 etat
     getBatimentCoord batiment `shouldBe` C 0 0
 
 -- Tests for removing buildings
@@ -56,9 +56,9 @@ removalTests = do
     let routes = Route (Rectangle (C 0 0) 10 10)
         zones = Map.fromList [(ZonId 0, routes)]
         ville = Ville Map.empty Map.empty zones
-        etat = Etat {ville = ville, coins = 0, carte = Map.empty, currentTime = 0, events = Map.empty, selection = None}
+        etat = Etat {ville = ville, coins = 100, carte = Map.empty, currentTime = 0, events = Map.empty, selection = None}
         batiment = Cabane (Rectangle (C 0 0) 5 5) (C 0 0) 10 []
-        (newEtat, batId) = createBatiment batiment etat
+        (newEtat, batId) = createBatiment batiment 80 etat
         coord = getBatimentCoord batiment
         newEtat' = removeBatiment batId newEtat
      in not $ isBatimentAt coord batId newEtat'

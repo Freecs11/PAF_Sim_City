@@ -11,6 +11,7 @@ import qualified Debug.Trace as T
 import Foreign.C.Types (CInt)
 import Formes
 import GameData
+import GameData (Batiment)
 import SDL
 import SDL (Point (..), Rectangle (..), V4 (..))
 import qualified SDL
@@ -24,23 +25,19 @@ import TextureMap
 -- TOCHANGE
 -- récupère tous les coordonéés de tous les batiments
 getBatimentsCoords :: Etat -> [Coord]
-getBatimentsCoords (Etat {ville = ville}) = let batiments = getBatiments ville
-    in Map.foldrWithKey step [] batiments
-    where
-        step :: BatId -> Batiment -> [Coord] -> [Coord]
-        step batId batiment acc = (getBatimentCoord batiment) : acc
-
+getBatimentsCoords (Etat {ville = ville}) =
+  let batiments = getBatiments ville
+   in Map.foldrWithKey step [] batiments
+  where
+    step :: BatId -> Batiment -> [Coord] -> [Coord]
+    step batId batiment acc = (getBatimentCoord batiment) : acc
 
 -- check if a building is at a coordinate
 isBatimentAt :: Coord -> BatId -> Etat -> Bool
 isBatimentAt coord batId (Etat {ville = ville}) =
   let batiments = getBatiments ville
    in case Map.lookup batId batiments of
-        Just batiment -> case batiment of
-          Cabane forme coord' _ _ -> coord == coord'
-          Atelier forme coord' _ _ -> coord == coord'
-          Epicerie forme coord' _ _ -> coord == coord'
-          Commissariat forme coord' -> coord == coord'
+        Just batiment -> (getBatimentCoord batiment) == coord
         Nothing -> False
 
 -- verify if the Coord and BatId of the state are coherent

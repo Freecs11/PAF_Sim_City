@@ -1,11 +1,14 @@
 -- Spec.hs
-import Test.Hspec
-import qualified FormeTests
-import qualified CitoyenTests
+
+import qualified AStarTests
 import qualified BatimentsTests
+import qualified CitoyenTests
+import qualified FormeTests
+import Test.Hspec
 
 main :: IO ()
 main = hspec $ do
   describe "Forme Tests" FormeTests.spec
   describe "Citoyen Tests" CitoyenTests.spec
   describe "Batiment Tests" BatimentsTests.spec
+  describe "AStar Tests" AStarTests.spec

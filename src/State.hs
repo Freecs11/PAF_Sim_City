@@ -5,14 +5,16 @@ module State where
 
 import AStarPathfinding
 import Batiments
+import Batiments (getBatimentCoord)
 import Citoyens
-import Control.Monad (when)
+import Control.Monad (foldM, when)
 import Control.Monad.State (State, get, modify, put)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Formes
 import GameData
+import GameData (CitId (CitId))
 
 -- Initialize game state with one building (TESTING)
 initialiseStateWithBuilding :: Int -> Etat
@@ -42,13 +44,12 @@ getSelectedBuilding :: Etat -> Selection
 getSelectedBuilding (Etat {selection = selection}) = selection
 
 getTime :: Etat -> Int
-getTime (Etat { currentTime = time }) = time
+getTime (Etat {currentTime = time}) = time
 
 getTimeMonad :: State Etat Int
 getTimeMonad = do
-    state <- get
-    return $ currentTime state
-
+  state <- get
+  return $ currentTime state
 
 -- menu :: IO (Map.Map String (Int, Int, Int))
 -- menu = return $ Map.fromList [("Cabane", (100, 500, 80)),
@@ -100,11 +101,13 @@ processEvents tick = do
 processEvent :: Event -> State Etat ()
 processEvent event = case event of
   Move coord citId -> moveCitizen coord citId
-  -- StartWork citId -> startWork citId
-  -- GoShopping citId -> goShopping citId
-  -- GoHome citId -> goHome citId
-  -- UpdateNeeds citId -> updateNeeds citId
-  -- UpdateHappiness citId -> updateHappiness citId
+  GoWork citId -> goWork citId
+  GoShopping citId -> goShopping citId
+  GoHome citId -> goHome citId
+  UpdateMoney citId -> updateCitizenMoney citId
+  UpdateHunger citId -> updateCitizenHunger citId
+  UpdateFatigue citId -> updateCitizenFatigue citId
+  UpdateCitizens -> updateCitizens
   FollowPath (nextCoord : remainingPath) citId -> do
     movingCitizen nextCoord citId
     state <- get
@@ -147,8 +150,148 @@ moveCitizen newCoord citId = do
         Nothing -> newCoord -- error handling (for testing TODO /!\)
   let path = aStar start newCoord state
   case path of
-    Just (_, p) -> scheduleEvent (currentTime state) (FollowPath p citId)
-    Nothing -> return () -- No path found, do nothing
+    Just (_, p) -> scheduleEvent ((currentTime state) + 1000) (FollowPath p citId)
+    Nothing -> put state -- No path found, do nothing
+
+goHome :: CitId -> State Etat ()
+goHome citId = do
+  state <- get
+  let citizen = viCit (ville state) Map.! citId
+  case citizen of
+    Habitant coord (money, fatigue, hunger) (home, work, shop) _ -> do
+      let homeCoord = getBatimentCoordFromBatId home state
+      case homeCoord of
+        Just c -> do
+          let newCitizen = Habitant c (money, fatigue, hunger) (home, work, shop) (SeDeplacer c)
+          let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
+          put state {ville = newVille}
+          scheduleEvent ((currentTime state) + 1000) (Move c citId)
+        Nothing -> put state
+
+goShopping :: CitId -> State Etat ()
+goShopping citId = do
+  state <- get
+  let citizen = viCit (ville state) Map.! citId
+  case citizen of
+    Habitant coord (money, fatigue, hunger) (home, work, shop) _ -> do
+      shopID <- case shop of
+        Just s -> return s
+        Nothing -> return (BatId 0)
+      let shopCoord = getBatimentCoordFromBatId shopID state
+      case shopCoord of
+        Just c -> do
+          let newCitizen = Habitant c (money, fatigue, hunger) (home, work, shop) (SeDeplacer c)
+          let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
+          put state {ville = newVille}
+          scheduleEvent ((currentTime state) + 1000) (Move c citId)
+        Nothing -> put state
+
+goWork :: CitId -> State Etat ()
+goWork citId = do
+  state <- get
+  let citizen = viCit (ville state) Map.! citId
+  case citizen of
+    Habitant coord (money, fatigue, hunger) (home, work, shop) _ -> do
+      workID <- case work of
+        Just w -> return w
+        Nothing -> return (BatId 0)
+      let workCoord = getBatimentCoordFromBatId workID state
+      case workCoord of
+        Just c -> do
+          let newCitizen = Habitant c (money, fatigue, hunger) (home, work, shop) (SeDeplacer c)
+          let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
+          put state {ville = newVille}
+          scheduleEvent ((currentTime state) + 1000) (Move c citId)
+        Nothing -> put state
+
+updateCitizenMoney :: CitId -> State Etat ()
+updateCitizenMoney citId = do
+  state <- get
+  let citizen = viCit (ville state) Map.! citId
+  case citizen of
+    Habitant coord (money, fatigue, hunger) (home, work, shop) statut ->
+      if money < 50
+        then do
+          let newCitizen = Habitant coord (money + 100, fatigue, hunger) (home, work, shop) statut
+          let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
+          put state {ville = newVille}
+          scheduleEvent ((currentTime state) + 1000) (GoWork citId)
+        else do
+          put state
+
+updateCitizenHunger :: CitId -> State Etat ()
+updateCitizenHunger citId = do
+  state <- get
+  let citizen = viCit (ville state) Map.! citId
+  case citizen of
+    Habitant coord (money, fatigue, hunger) (home, work, shop) statut ->
+      if hunger < 50
+        then do
+          let newCitizen = Habitant coord (money - 20, fatigue - 20, hunger + 50) (home, work, shop) statut
+          let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
+          put state {ville = newVille}
+          scheduleEvent ((currentTime state) + 1000) (GoShopping citId)
+        else do
+          put state
+
+updateCitizenFatigue :: CitId -> State Etat ()
+updateCitizenFatigue citId = do
+  state <- get
+  let citizen = viCit (ville state) Map.! citId
+  case citizen of
+    Habitant coord (money, fatigue, hunger) (home, work, shop) statut ->
+      if fatigue <= 0
+        then do
+          let newCitizen = Habitant coord (money, fatigue + 100, hunger) (home, work, shop) statut
+          let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
+          put state {ville = newVille}
+          scheduleEvent ((currentTime state) + 1000) (GoHome citId)
+        else do
+          put state
+
+updateCitizens :: State Etat ()
+updateCitizens = do
+  state <- get
+  let citoyens = Map.keys (viCit (ville state))
+  newState <- foldM updateCitizen state citoyens
+  put newState
+  where
+    updateCitizen :: Etat -> CitId -> State Etat Etat
+    updateCitizen st citID = do
+      let (Habitant coord (money, fatigue, hunger) (home, work, shop) _) = viCit (ville st) Map.! citID
+      let homeBatCoord = getBatimentCoord (viBat (ville st) Map.! home)
+      workID <- case work of
+        Just w -> return w
+        Nothing -> return (BatId 0)
+      let workBatCoord = getBatimentCoord (viBat (ville st) Map.! workID)
+      shopID <- case shop of
+        Just s -> return s
+        Nothing -> return (BatId 0)
+      let shopBatCoord = getBatimentCoord (viBat (ville st) Map.! shopID)
+      let time = currentTime st
+
+      let newCitizen = case coord of
+            _
+              | coord == homeBatCoord ->
+                  Habitant coord (money, fatigue, hunger) (home, work, shop) Dormir
+              | coord == workBatCoord ->
+                  Habitant coord (money, fatigue, hunger) (home, work, shop) Travailler
+              | coord == shopBatCoord ->
+                  Habitant coord (money, fatigue, hunger) (home, work, shop) FaireCourses
+              | otherwise ->
+                  Habitant coord (money, fatigue, hunger) (home, work, shop) (SeDeplacer coord)
+
+      let newVille = (ville st) {viCit = Map.insert citID newCitizen (viCit (ville st))}
+      let newState = st {ville = newVille}
+
+      case coord of
+        _
+          | coord == homeBatCoord -> scheduleEvent (time + 8000) (GoWork citID)
+          | coord == workBatCoord -> scheduleEvent (time + 8000) (GoShopping citID)
+          | coord == shopBatCoord -> scheduleEvent (time + 2000) (GoHome citID)
+          | otherwise -> return ()
+
+      return newState
 
 -- moves a citizen to a new coordinate in the state
 movingCitizen :: Coord -> CitId -> State Etat ()

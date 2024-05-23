@@ -9,6 +9,7 @@ import qualified Data.Map as Map
 import Data.Ord (comparing)
 import qualified Data.PQueue.Prio.Min as PQ
 import qualified Data.Set as Set
+import Formes (appartient)
 import GameData
 import Zone (getRoutesCoords)
 
@@ -36,9 +37,10 @@ neighbors (C x y) =
   ]
 
 getNextNodesAndCost :: Coord -> Etat -> [(Coord, Int)]
-getNextNodesAndCost coord etat = do
-  let routesCoords = getRoutesCoords etat
-  foldr (\coord' acc -> if coord' `elem` routesCoords then (coord', 1) : acc else acc) [] (neighbors coord)
+getNextNodesAndCost coord etat =
+  let neighborsList = neighbors coord
+      routes = getRoutesCoords etat
+   in foldr (\n acc -> foldr (\r acc' -> if appartient n r then (n, 1) : acc' else acc') acc routes) [] neighborsList
 
 -- aStar :: Set.Set Coord -> Coord -> Coord -> Maybe [Coord]
 -- aStar obstacles start goal = aStar' (Map.singleton start (Node start 0 (heuristic start goal) Nothing)) Set.empty

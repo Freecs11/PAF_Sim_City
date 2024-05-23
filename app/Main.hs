@@ -64,7 +64,7 @@ rectangularZone coord w h = GameData.Rectangle coord w h
 loadBackground :: Renderer -> FilePath -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
 loadBackground rdr path tmap smap = do
   tmap' <- TM.loadTexture rdr path (TextureId "grass") tmap
-  let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage (TextureId "grass") (S.mkArea 0 0 1640 1480)
+  let sprite = S.defaultScale $ S.addImage S.createEmptySprite $ S.createImage (TextureId "grass") (S.mkArea 0 0 8000 8000)
   let smap' = SM.addSprite (SpriteId "grass") sprite smap
   return (tmap', smap')
 
@@ -147,6 +147,12 @@ getTextureId sprite = case S.currentImage sprite of
 applyOffset :: Coord -> Coord -> Coord
 applyOffset (C x y) (C dx dy) = C (x + dx) (y + dy)
 
+renderBackgroundMap :: Renderer -> TextureMap -> SpriteMap -> Coord -> IO ()
+renderBackgroundMap renderer tmap smap offset = do
+  let sprite = SM.fetchSprite (SpriteId "grass") smap
+  let (x, y) = getXY offset
+  S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral x) (fromIntegral y))
+
 renderBuildings :: Renderer -> TextureMap -> SpriteMap -> Ville -> Coord -> IO ()
 renderBuildings renderer tmap smap ville offset = do
   let buildings = Map.elems $ viBat ville
@@ -178,7 +184,7 @@ main = do
   window <- createWindow "Sim City" $ defaultWindow {windowInitialSize = V2 windowsWidth windowsHeight}
   renderer <- createRenderer window (-1) defaultRenderer
   -- chargement de l'image du fond
-  (tmap, smap) <- loadBackground renderer "assets/grass.bmp" TM.createTextureMap SM.createSpriteMap
+  (tmap, smap) <- loadBackground renderer "assets/micropolisMap.bmp" TM.createTextureMap SM.createSpriteMap
   -- chargement du personnage
   (tmap'', smap'') <- loadPerso renderer "assets/perso.bmp" tmap smap
 
@@ -239,7 +245,7 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
         None -> "None"
   --- display background
   -- S.displaySprite renderer tmap (SM.fetchSprite (SpriteId "grass") smap)
-
+  renderBackgroundMap renderer tmap smap (worldOffset $ world gameStateW)
   -- Display the selected building on the screen top left
   -- S.displayText renderer font ("Selected building: " <> pack selectedBuilding) (V2 3 5) (V4 255 255 255 255)
 
@@ -271,7 +277,7 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
   -- Display zones menu
   renderZonesMenuItems renderer font zonesMenuItems
   -- update the screen background color to black
-  SDL.rendererDrawColor renderer $= V4 0 0 0 255
+  -- SDL.rendererDrawColor renderer $= V4 0 0 0 255
 
   present renderer
 

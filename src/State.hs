@@ -7,41 +7,39 @@ import AStarPathfinding
 import Batiments
 import Batiments (getBatimentCoord)
 import Citoyens
-import Control.Monad (foldM, when )
+import Control.Monad (foldM, forM_, when)
 import Control.Monad.State (State, get, modify, put)
+import qualified Control.Monad.State as St
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
+import Debug.Trace (trace)
 import Formes
 import GameData
 import GameData (CitId (CitId))
-import qualified Control.Monad.State as St
-import Data.Maybe (fromMaybe)
-import Debug.Trace (trace)
-import Control.Monad (forM_)
-
-
 
 -- Initialize game state with one building (TESTING)
 initialiseStateWithBuilding :: Int -> Etat
-initialiseStateWithBuilding coins = Etat
-  { ville = 
-      Ville
-        { viBat = Map.empty,
-          viCit = Map.empty,
-          viZones = Map.empty
-        },
-    coins = coins,
-    carte = Map.empty,
-    currentTime = 0,
-    events = Map.empty,
-    selection = None,
-    world = World { worldOffset = C 0 0 },
-    routeDirection = Horizontal,
-    selectionStart = Nothing,
-    pathCache = Map.empty, -- Initialize the path cache
-    pathfindingQueue = [] -- Initialize the pathfinding queue
-  }
+initialiseStateWithBuilding coins =
+  Etat
+    { ville =
+        Ville
+          { viBat = Map.empty,
+            viCit = Map.empty,
+            viZones = Map.empty
+          },
+      coins = coins,
+      carte = Map.empty,
+      currentTime = 0,
+      events = Map.empty,
+      selection = None,
+      world = World {worldOffset = C 0 0},
+      routeDirection = Horizontal,
+      selectionStart = Nothing,
+      pathCache = Map.empty, -- Initialize the path cache
+      pathfindingQueue = [] -- Initialize the pathfinding queue
+    }
 
 getSelectedBuilding :: Etat -> Selection
 getSelectedBuilding (Etat {selection = selection}) = selection
@@ -121,7 +119,6 @@ processEvent event = case event of
   PlaceRoute coord -> placeRoute coord
   _ -> return ()
 
-
 placeRoute :: Coord -> State Etat ()
 placeRoute coord = modify $ \state ->
   let newZoneRoute = GameData.Route (GameData.Rectangle coord 120 20)
@@ -146,7 +143,7 @@ taxRetreival amount = do
           state
           citoyens
   put newState
-  scheduleEvent (currentTime newState + 10000) (TaxRetreival amount)
+  scheduleEvent (currentTime newState + 3000) (TaxRetreival amount)
 
 -- moveCitizen :: Coord -> CitId -> State Etat ()
 -- moveCitizen newCoord citId = do
@@ -157,7 +154,7 @@ taxRetreival amount = do
 --         Nothing -> newCoord
 --   let path = aStar start newCoord state
 --   case path of
---     Just (_, p) -> 
+--     Just (_, p) ->
 --       let testPath = [(C 100 100), (C 100 200), (C 100 300), (C 100 400), (C 100 500), (C 100 600), (C 100 700), (C 100 800), (C 100 900), (C 100 1000)]
 --       -- trace to display the path
 --       in
@@ -168,25 +165,23 @@ taxRetreival amount = do
 -- getClosestRouteToCitoyen Nothing _ = Nothing
 -- getClosestRouteToCitoyen (Just coord) state =
 --   let routes = Map.elems $ Map.filter isRoute (viZones $ ville state)
---       closestRoute = foldr (\route acc -> 
+--       closestRoute = foldr (\route acc ->
 --                               let routeCoord = getZoneCoord route
 --                                   accCoord = fromMaybe coord acc
---                               in if mdistance coord routeCoord < mdistance coord accCoord 
---                                  then Just routeCoord 
---                                  else acc) 
---                            Nothing 
+--                               in if mdistance coord routeCoord < mdistance coord accCoord
+--                                  then Just routeCoord
+--                                  else acc)
+--                            Nothing
 --                            routes
 --   in closestRoute
-
-
 
 moveCitizen :: PathfindingRequest -> State Etat ()
 moveCitizen (PathfindingRequest citId newCoord) = do
   state <- St.get
   let citizen = viCit (ville state) Map.! citId
   let citCoord = fromMaybe (newCoord) (getCoordCitoyen citId state)
-  let start = fromMaybe citCoord  (getCoordCitoyen citId state) 
-  let nd = fromMaybe newCoord  (Just newCoord) 
+  let start = fromMaybe citCoord (getCoordCitoyen citId state)
+  let nd = fromMaybe newCoord (Just newCoord)
   path <- aStar start nd
   case path of
     Just (_, p) -> do
@@ -200,7 +195,7 @@ enqueuePathfindingRequest citId newCoord = do
   state <- St.get
   let queue = pathfindingQueue state
   let newQueue = queue ++ [PathfindingRequest citId newCoord]
-  put state { pathfindingQueue = newQueue }
+  put state {pathfindingQueue = newQueue}
 
 -- Process a fixed number of pathfinding requests per tick
 processPathfindingQueue :: Int -> State Etat ()
@@ -209,36 +204,7 @@ processPathfindingQueue batchSize = do
   let queue = pathfindingQueue state
   let (toProcess, remainingQueue) = splitAt batchSize queue
   mapM_ moveCitizen toProcess
-  put state { pathfindingQueue = remainingQueue }
-
-
-
-getClosestRouteToCitoyen :: Maybe Coord -> Etat -> Maybe Coord
-getClosestRouteToCitoyen Nothing _ = Nothing
-getClosestRouteToCitoyen (Just coord) state =
-  let routes = Map.elems $ Map.filter isRoute (viZones $ ville state)
-      closestRoute = foldr (\route acc ->
-                              let routeCoord = getZoneCoord route
-                                  accCoord = fromMaybe coord acc
-                              in if mdistance coord routeCoord < mdistance coord accCoord
-                                 then Just routeCoord
-                                 else acc)
-                           Nothing
-                           routes
-  in closestRoute
-
-isRoute :: Zone -> Bool
-isRoute (Route _) = True
-isRoute _ = False
-
-getZoneCoord :: Zone -> Coord
-getZoneCoord (Route forme) = getFormeCoord forme
-getZoneCoord _ = error "Not a route"
-
-mdistance :: Coord -> Coord -> Int
-mdistance (C x1 y1) (C x2 y2) = abs (x1 - x2) + abs (y1 - y2)
-
-
+  put state {pathfindingQueue = remainingQueue}
 
 goHome :: CitId -> State Etat ()
 goHome citId = do
@@ -249,10 +215,11 @@ goHome citId = do
       let homeCoord = getBatimentCoordFromBatId home state
       case homeCoord of
         Just c -> do
-          let newCitizen = Habitant c (money, fatigue, hunger) (home, work, shop) (SeDeplacer c)
+          let newCitizen = Habitant coord (money, fatigue - 80, hunger - 100) (home, work, shop) (SeDeplacer c)
           let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
           put state {ville = newVille}
           scheduleEvent ((currentTime state) + 100) (Move [PathfindingRequest citId c])
+          scheduleEvent ((currentTime state) + 500) (GoWork citId)
         Nothing -> put state
 
 goShopping :: CitId -> State Etat ()
@@ -267,10 +234,11 @@ goShopping citId = do
       let shopCoord = getBatimentCoordFromBatId shopID state
       case shopCoord of
         Just c -> do
-          let newCitizen = Habitant c (money, fatigue, hunger) (home, work, shop) (SeDeplacer c)
+          let newCitizen = Habitant coord (money, fatigue - 20, hunger + 100) (home, work, shop) (SeDeplacer c)
           let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
           put state {ville = newVille}
           scheduleEvent ((currentTime state) + 100) (Move [PathfindingRequest citId c])
+          scheduleEvent ((currentTime state) + 500) (GoHome citId)
         Nothing -> put state
 
 goWork :: CitId -> State Etat ()
@@ -285,10 +253,11 @@ goWork citId = do
       let workCoord = getBatimentCoordFromBatId workID state
       case workCoord of
         Just c -> do
-          let newCitizen = Habitant coord (money, fatigue, hunger) (home, work, shop) (SeDeplacer c)
+          let newCitizen = Habitant coord (money + 100, fatigue, hunger) (home, work, shop) (SeDeplacer c)
           let newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
           put state {ville = newVille}
           scheduleEvent ((currentTime state) + 100) (Move [PathfindingRequest citId c])
+          scheduleEvent ((currentTime state) + 1500) (GoShopping citId)
         Nothing -> put state
 
 updateCitizenMoney :: CitId -> State Etat ()
@@ -404,12 +373,20 @@ assignBuildingstoCitizens = do
   let batiments = getBatiments (ville state) -- Map BatId Batiment
 
   -- Get work and shopping buildings with available slots
-  let workBuildings = Map.filter (\bat -> case bat of
-                        Atelier _ _ maxCit _ -> maxCit > 0
-                        _ -> False) batiments
-  let shoppingBuildings = Map.filter (\bat -> case bat of
-                           Epicerie _ _ maxCit _ -> maxCit > 0
-                           _ -> False) batiments
+  let workBuildings =
+        Map.filter
+          ( \bat -> case bat of
+              Atelier _ _ maxCit _ -> maxCit > 0
+              _ -> False
+          )
+          batiments
+  let shoppingBuildings =
+        Map.filter
+          ( \bat -> case bat of
+              Epicerie _ _ maxCit _ -> maxCit > 0
+              _ -> False
+          )
+          batiments
 
   let habitants =
         Map.filter
@@ -452,7 +429,7 @@ assignBuildingstoCitizens = do
         foldr
           ( \(citId, batId) acc ->
               case Map.lookup citId acc of
-                Just (Habitant coord stats (home, work, _ ) occ) -> Map.insert citId (Habitant coord stats (home, work, Just batId) occ) acc
+                Just (Habitant coord stats (home, work, _) occ) -> Map.insert citId (Habitant coord stats (home, work, Just batId) occ) acc
                 _ -> acc
           )
           newCitoyensWithWork
@@ -464,7 +441,7 @@ assignBuildingstoCitizens = do
 assignCitizensToBuildings :: [CitId] -> Map BatId Batiment -> [(CitId, BatId)]
 assignCitizensToBuildings [] _ = []
 assignCitizensToBuildings _ buildings | Map.null buildings = []
-assignCitizensToBuildings (citId:citIds) buildings =
+assignCitizensToBuildings (citId : citIds) buildings =
   case findAvailableBuilding buildings of
     Just (batId, updatedBuildings) ->
       (citId, batId) : assignCitizensToBuildings citIds updatedBuildings
@@ -474,7 +451,7 @@ assignCitizensToBuildings (citId:citIds) buildings =
 findAvailableBuilding :: Map BatId Batiment -> Maybe (BatId, Map BatId Batiment)
 findAvailableBuilding buildings =
   case Map.toList $ Map.filter hasCapacity buildings of
-    ((batId, batiment):_) -> Just (batId, Map.adjust decreaseCapacity batId buildings)
+    ((batId, batiment) : _) -> Just (batId, Map.adjust decreaseCapacity batId buildings)
     _ -> Nothing
 
 -- Check if a building has capacity for more citizens
@@ -488,4 +465,3 @@ decreaseCapacity :: Batiment -> Batiment
 decreaseCapacity (Atelier d coord maxCit ctz) = Atelier d coord (maxCit - 1) ctz
 decreaseCapacity (Epicerie d coord maxCit ctz) = Epicerie d coord (maxCit - 1) ctz
 decreaseCapacity bat = bat
-

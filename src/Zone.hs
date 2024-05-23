@@ -7,32 +7,32 @@ import Debug.Trace (trace)
 
 import GameData
 import Formes
-
+import GameData
 
 -- get all coords of routes in the city
-getRoutesCoords :: Etat -> [Coord]
-getRoutesCoords etat@(Etat {ville = ville}) = 
-    let zones = getZones ville
-    in Map.foldrWithKey step [] zones
-    where
-        step :: ZonId -> Zone -> [Coord] -> [Coord]
-        step zonId zone acc = case zone of
-            Route forme -> getFormeCoord forme : acc
-            _ -> acc
-
+getRoutesCoords :: Etat -> [Forme]
+getRoutesCoords etat@(Etat {ville = ville}) =
+  let zones = getZones ville
+   in Map.foldrWithKey step [] zones
+  where
+    step :: ZonId -> Zone -> [Forme] -> [Forme]
+    step zonId zone acc =
+      case zone of
+        Route forme -> forme : acc
+        _ -> acc
 
 -- check if a zone is at a coordinate
 isZoneAt :: Coord -> ZonId -> Etat -> Bool
-isZoneAt coord zonId (Etat {ville = ville}) = 
-    let zones = getZones ville
-    in case Map.lookup zonId zones of
+isZoneAt coord zonId (Etat {ville = ville}) =
+  let zones = getZones ville
+   in case Map.lookup zonId zones of
         Just zone -> case zone of
-            Eau forme -> coord == getFormeCoord forme
-            Route forme -> coord == getFormeCoord forme
-            ZR forme _ -> coord == getFormeCoord forme
-            ZI forme _ -> coord == getFormeCoord forme
-            ZC forme _ -> coord == getFormeCoord forme
-            Admin forme _ -> coord == getFormeCoord forme
+          Eau forme -> coord == getFormeCoord forme
+          Route forme -> coord == getFormeCoord forme
+          ZR forme _ -> coord == getFormeCoord forme
+          ZI forme _ -> coord == getFormeCoord forme
+          ZC forme _ -> coord == getFormeCoord forme
+          Admin forme _ -> coord == getFormeCoord forme
         Nothing -> False
 -- create a zone if it's valid
 createZone :: Zone -> Int  -> Etat-> Etat
@@ -44,9 +44,9 @@ createZone zone cost etat@(Etat {ville = ville})  =
                 in etat {ville = ville {viZones = updatedZones} , coins = (coins etat) - cost}  
         False -> etat
 
--- zones are valid if they are not already in the city 
+-- zones are valid if they are not already in the city
 -- and if they are disjoint from the zones already in the city
--- and also if it's a ZR, ZI or ZC zone, it must be adjacent to a route 
+-- and also if it's a ZR, ZI or ZC zone, it must be adjacent to a route
 isZoneValid :: Zone -> Etat -> Bool
 isZoneValid zone etat@(Etat {ville = ville}) = 
     let zones = getZones ville
@@ -84,27 +84,31 @@ collisionWithMargin f1 f2 =
 
 -- check if a zone is adjacent to a route
 isZoneAdjacentToRoute :: Forme -> Map ZonId Zone -> Bool
-isZoneAdjacentToRoute forme zones = 
-    let routes = Map.filterWithKey (\zonId zone -> case zone of
-            Route _ -> True
-            _ -> False) zones
-    in any (\zone -> adjacentes forme (getForme zone)) routes
+isZoneAdjacentToRoute forme zones =
+  let routes =
+        Map.filterWithKey
+          ( \zonId zone -> case zone of
+              Route _ -> True
+              _ -> False
+          )
+          zones
+   in any (\zone -> adjacentes forme (getForme zone)) routes
 
 getForme :: Zone -> Forme
-getForme zone = 
-    case zone of
-        Eau forme -> forme
-        Route forme -> forme
-        ZR forme _ -> forme
-        ZI forme _ -> forme
-        ZC forme _ -> forme
-        Admin forme _ -> forme
+getForme zone =
+  case zone of
+    Eau forme -> forme
+    Route forme -> forme
+    ZR forme _ -> forme
+    ZI forme _ -> forme
+    ZC forme _ -> forme
+    Admin forme _ -> forme
 
 -- invarinat on zones 
 prop_inv_Zones :: Etat -> Bool
-prop_inv_Zones etat@(Etat {ville = ville}) = 
-    let zones = getZones ville
-    in Map.foldrWithKey step True zones
-    where
-        step :: ZonId -> Zone -> Bool -> Bool
-        step zonId zone acc = acc && isZoneValid zone etat
+prop_inv_Zones etat@(Etat {ville = ville}) =
+  let zones = getZones ville
+   in Map.foldrWithKey step True zones
+  where
+    step :: ZonId -> Zone -> Bool -> Bool
+    step zonId zone acc = acc && isZoneValid zone etat

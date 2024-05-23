@@ -37,6 +37,7 @@ import qualified State as State
 import TextureMap (TextureId (..), TextureMap)
 import qualified TextureMap as TM
 import Zone
+import System.Random (randomRs, mkStdGen)
 
 windowsWidth :: CInt
 windowsWidth = 1280
@@ -318,15 +319,20 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
 
   -- scheduleEvent
   -- let gameStateWithEvent = execState (State.scheduleEvent (State.getTime gameStateW + 10) updateEvent) gameStateCitizens
+
+   -- Process a fixed number of pathfinding requests per tick
+  let batchSize = 10 -- Adjust the batch size as needed
+  let gameStateProcessed = execState (State.processPathfindingQueue batchSize) gameStateCitizens
+
   -- Update game state using State monad
   let gameState' =
         execState
           ( do
-              State.processEvents (State.getTime gameStateCitizens)
+              State.processEvents (State.getTime gameStateProcessed)
               State.updateSelectedBuilding currentSelectedBuilding
-              State.scheduleEvent (State.getTime gameStateCitizens + 10) GameData.AssignBuildingstoCitizens
+              State.scheduleEvent (State.getTime gameStateProcessed + 10) GameData.AssignBuildingstoCitizens
           )
-          gameStateCitizens
+          gameStateProcessed
   unless (K.keypressed KeycodeEscape kbd') (gameLoop frameRate renderer tmap smap kbd' gameState' {currentTime = (currentTime gameState') + 1} mouse' font updatedMenuItems zonesMenuItems)
 
 toggleRouteDirection :: Etat -> Etat
@@ -362,7 +368,7 @@ createBuilding "Cabane" coord = do
     else return ()
 createBuilding "Atelier" coord = do
   etat <- St.get
-  let batiment = Atelier (GameData.Rectangle coord 50 50) coord 50 []
+  let batiment = Atelier (GameData.Rectangle coord 50 50) coord 200 []
   if coins etat >= 95
     then do
       let (newStat, _) = createBatiment batiment 95 etat
@@ -551,34 +557,41 @@ spawnCitizens :: Etat -> IO Etat
 spawnCitizens etat = do
   let batiments = GameData.getBatiments $ ville etat
   let homes = getHomes batiments
-  let etat' = execState (spawnCitizensForHomes homes) etat
+  let randomDelays = generateRandomDelays 120  
+  let etat' = execState (spawnCitizensForHomes homes  randomDelays 0) etat
   return etat'
 
--- Spawns citizens for each home and updates the state
-spawnCitizensForHomes :: [(BatId, Batiment)] -> State Etat ()
-spawnCitizensForHomes [] = return ()
-spawnCitizensForHomes ((batId, batiment) : xs) = do
+
+generateRandomDelays :: Int -> [Int]
+generateRandomDelays seed = randomRs (1, 1000) (mkStdGen seed)
+
+-- Function to spawn citizens for each home
+spawnCitizensForHomes :: [(BatId, Batiment)] -> [Int] -> Int -> State Etat ()
+spawnCitizensForHomes [] _ _ = return ()
+spawnCitizensForHomes ((batId, batiment) : xs) delays timedelay = do
   etat <- St.get
   case batiment of
     Cabane d coord maxCitizens ctz -> do
       if length ctz >= maxCitizens
-        then spawnCitizensForHomes xs
+        then spawnCitizensForHomes xs delays timedelay
         else do
           let (newCitoyens, newEtat) = spawnCitizensForHome batId coord maxCitizens ctz etat
           let updatedBatiment = Cabane d coord maxCitizens (ctz ++ newCitoyens)
-          let newState' = foldr (\citId acc -> execState (do State.scheduleEvent (State.getTime acc + 10) (GameData.GoWork citId)) acc) newEtat newCitoyens
-          put $ updateBatiment updatedBatiment batId newState'
-          spawnCitizensForHomes xs
-    _ -> spawnCitizensForHomes xs
+          let (finalEtat, remainingDelays) = foldl (\(acc, d:ds) citId -> (execState (do State.scheduleEvent (State.getTime acc + 100 + d) (GameData.GoWork citId)) acc, ds)) (newEtat, delays) newCitoyens
+          put $ updateBatiment updatedBatiment batId finalEtat
+          spawnCitizensForHomes xs remainingDelays (timedelay + 100)
+    _ -> spawnCitizensForHomes xs delays timedelay
+
+
 
 -- Spawns citizens for a home
 spawnCitizensForHome :: BatId -> Coord -> Int -> [CitId] -> Etat -> ([CitId], Etat)
 spawnCitizensForHome _ _ 0 ctz etat = (ctz, etat)
 spawnCitizensForHome batId coord maxCitizens ctz etat =
-  if length ctz >= maxCitizens
+  if length ctz  >= maxCitizens
     then (ctz, etat)
     else
-      let citoyen = Habitant coord (10, 10, 10) (batId, Nothing, Nothing) GameData.Dormir
+      let citoyen = Habitant coord (1000, 1000, 1000) (batId, Nothing, Nothing) GameData.Dormir
           (etatN, citId) = createCitoyen citoyen etat
        in spawnCitizensForHome batId coord (maxCitizens - 1) (ctz ++ [citId]) etatN
 

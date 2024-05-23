@@ -111,8 +111,13 @@ getBatiments (Ville {viBat = b}) = b
 getCitoyens :: Ville -> Map CitId Citoyen
 getCitoyens (Ville {viCit = c}) = c
 
+data PathfindingRequest = PathfindingRequest CitId Coord deriving (Eq, Show)
+
+-- Queue to handle pathfinding requests
+type PathfindingQueue = [PathfindingRequest] 
+
 data Event
-  = Move Coord CitId -- évenement pour déplacer un citoyen vers un Coord ( normalement celui d'un batiment)
+  = Move PathfindingQueue
   | GoWork CitId -- commence le travaille , va rajouté dans l'état le temps de fin de travail du citoyen comme currentTime + temps de travail
   -- comme ça si le temps de travail est fini on peut le faire rentrer chez lui en rajoutant un autre évenement GoHome
   | GoShopping CitId -- commence le shopping, meme principe que StartWork
@@ -150,7 +155,9 @@ data Etat = Etat
     selection :: Selection,
     world :: World,
     routeDirection :: RouteDirection,
-    selectionStart :: Maybe Coord
+    selectionStart :: Maybe Coord,
+    pathCache :: Map (Coord, Coord) (Int, [Coord]), -- Add path cache
+    pathfindingQueue :: PathfindingQueue
     -- mouseHeld :: Bool
   }
   deriving (Show, Eq)

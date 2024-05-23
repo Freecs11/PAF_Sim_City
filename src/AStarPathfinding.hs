@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import Formes (appartient, adjacent)
 import GameData
 import Zone (getRoutesCoords)
+import Control.Monad.State (State, get, put, modify)
 
 data Node = Node
   { coord :: Coord,
@@ -33,15 +34,18 @@ neighbors (C x y) =
   [ C (x + 1) y,
     C (x - 1) y,
     C x (y + 1),
-    C x (y - 1)
+    C x (y - 1),
+    C (x + 1) (y + 1),
+    C (x - 1) (y - 1),
+    C (x + 1) (y - 1),
+    C (x - 1) (y + 1)
   ]
+
 getNextNodesAndCost :: Coord -> Etat -> [(Coord, Int)]
 getNextNodesAndCost coord etat =
   let neighborsList = neighbors coord
       routes = getRoutesCoords etat
-   in foldr (\n acc -> foldr (\r acc' -> if adjacent n r then (n, 1) : acc' else (n,105):acc') acc routes) [] neighborsList
-
-
+   in foldr (\n acc -> foldr (\r acc' -> if adjacent n r then (n, 1) : acc' else (n, 1005) : acc') acc routes) [] neighborsList
 
 astar ::
   Coord -> Coord -> Etat -> (Coord -> Etat -> [(Coord, Int)]) -> (Coord -> Coord -> Int) -> Maybe (Int, [Coord])
@@ -71,5 +75,17 @@ astar startNode goalNode etat nextNodes heuristic =
         then findPath tracks (tracks Map.! node) ++ [node]
         else [node]
 
-aStar :: Coord -> Coord -> Etat -> Maybe (Int, [Coord])
-aStar start goal etat = astar start goal etat getNextNodesAndCost heuristic
+-- A* search with memoization
+aStar :: Coord -> Coord -> State Etat (Maybe (Int, [Coord]))
+aStar start goal = do
+  state <- get
+  let cache = pathCache state
+  case Map.lookup (start, goal) cache of
+    Just path -> return (Just path) -- Path is cached
+    Nothing -> do
+      let path = astar start goal state getNextNodesAndCost heuristic
+      case path of
+        Just p -> do
+          modify (\s -> s { pathCache = Map.insert (start, goal) p (pathCache s) })
+          return (Just p)
+        Nothing -> return Nothing

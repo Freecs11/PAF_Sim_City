@@ -72,13 +72,26 @@ prop_appartient_postcondition coord@(C x y) forme =
         VSegment (C x' y') l -> x == x' && y >= y' && y < y' + l
         Rectangle (C x' y') w h -> x >= x' && x < x' + w && y >= y' && y < y' + h)
 
+adjacentes :: Forme -> Forme -> Bool
+adjacentes f1 f2 = any (\c -> adjacent c f2) (getCoords f1)
 
 adjacent :: Coord -> Forme -> Bool
-adjacent (C x y) (HSegment (C x' y') l) = (x == x' + l || x == x' - 1) && y >= y' && y < y' + 1
-adjacent (C x y) (VSegment (C x' y') l) = (y == y' + l || y == y' - 1) && x >= x' && x < x' + 1
-adjacent (C x y) (Rectangle (C x' y') l h) = 
-    ((x == x' + l || x == x' - 1) && (y >= y' && y < y' + h)) || 
-    ((y == y' + h || y == y' - 1) && (x >= x' && x < x' + l))
+adjacent (C x y) (HSegment (C x' y') l) = 
+    let margin = 10
+    in (x >= x' - margin && x <= x' + l + margin) && (y >= y' - margin && y <= y' + margin)
+adjacent (C x y) (VSegment (C x' y') l) = 
+    let margin = 10
+    in (y >= y' - margin && y <= y' + l + margin) && (x >= x' - margin && x <= x' + margin)
+adjacent (C x y) (Rectangle (C x' y') w h) = 
+    let margin = 10
+    in ((x >= x' - margin && x <= x' + w + margin) && (y >= y' - margin && y <= y' + h + margin)) ||
+       ((y >= y' - margin && y <= y' + h + margin) && (x >= x' - margin && x <= x' + w + margin))
+
+getCoords :: Forme -> [Coord]
+getCoords (HSegment (C x y) l) = [C (x + i) y | i <- [0..(l-1)]]
+getCoords (VSegment (C x y) l) = [C x (y + i) | i <- [0..(l-1)]]
+getCoords (Rectangle (C x y) w h) = [C (x + i) (y + j) | i <- [0..(w-1)], j <- [0..(h-1)]]
+
 
 
 prop_adjacent_precondition :: Coord -> Forme -> Bool
@@ -105,11 +118,11 @@ prop_adjacent_invariant coord@(C x y) forme =
 
 
 collision :: Forme -> Forme -> Bool
-collision f1 f2 = let (n1, s1, o1, e1) = limites f1
-                      (n2, s2, o2, e2) = limites f2
-                  in n1 <= s2 && s1 >= n2 && o1 <= e2 && e1 >= o2 -- bouding box collision simple
-
-
+collision f1 f2 = 
+    let margin = 1  -- a margin of error
+        (n1, s1, o1, e1) = limites f1
+        (n2, s2, o2, e2) = limites f2
+    in n1 <= s2 + margin && s1 >= n2 - margin && o1 <= e2 + margin && e1 >= o2 - margin
 
 -- collision invariant and postcondition
 prop_collision_invariant :: Forme -> Forme -> Bool
@@ -125,11 +138,6 @@ prop_collision_postcondition f1 f2 =
 prop_collision_precondition :: Forme -> Forme -> Bool
 prop_collision_precondition f1 f2 = prop_limites_precondition f1 && prop_limites_precondition f2
 
-adjacentes :: Forme -> Forme -> Bool
-adjacentes f1 f2 = let (y1, y2, x1, x2) = limites f1
-                       (y1', y2', x1', x2') = limites f2
-                   in (x2 + 1 == x1' || x1 - 1 == x2') && (y1 <= y2' && y2 >= y1') ||
-                      (y2 + 1 == y1' || y1 - 1 == y2') && (x1 <= x2' && x2 >= x1')
 
 
 -- adjacentes invariant and postcondition

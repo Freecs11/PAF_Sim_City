@@ -92,11 +92,13 @@ prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) =
 createCitoyen :: Citoyen -> Etat -> (Etat, CitId)
 createCitoyen citoyen etat@(Etat {ville = ville}) =
   let citoyens = getCitoyens ville
-      citId = CitId (show $ Map.size citoyens)
+      citId = CitId (show $ Map.size citoyens + 1)
       updatedCitoyens = Map.insert citId citoyen citoyens
       updatedCarte = updateCarteCitoyen citId (getCoord citoyen) etat
    in (etat {ville = ville {viCit = updatedCitoyens}, carte = updatedCarte}, citId)
 
+
+-- update the carte with the new citizen
 -- update the carte with the new citizen
 updateCarteCitoyen :: CitId -> Coord -> Etat -> Map Coord (BatId, [CitId])
 updateCarteCitoyen citId coord etat@(Etat {carte = carte}) =

@@ -51,9 +51,18 @@ mouseButtonPressed mouse events =
                               _ -> False
   in any buttonPressed events 
 
+mouseButtonReleased :: MouseState -> [Event] -> Bool
+mouseButtonReleased mouse events =
+  let buttonReleased event = case eventPayload event of
+                                MouseButtonEvent mouseButtonEvent -> 
+                                  mouseButtonEventMotion mouseButtonEvent == Released
+                                _ -> False
+  in any buttonReleased events
+
+
+
 getMousePosition :: MouseState -> (Int, Int)
 getMousePosition (P (V2 x y)) = (x, y)
-
 
 -- Get the relative position of the mouse
 getMouseRel :: MouseState -> (Int, Int)

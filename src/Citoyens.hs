@@ -97,7 +97,6 @@ createCitoyen citoyen etat@(Etat {ville = ville}) =
       updatedCarte = updateCarteCitoyen citId (getCoord citoyen) etat
    in (etat {ville = ville {viCit = updatedCitoyens}, carte = updatedCarte}, citId)
 
-
 -- update the carte with the new citizen
 -- update the carte with the new citizen
 updateCarteCitoyen :: CitId -> Coord -> Etat -> Map Coord (BatId, [CitId])
@@ -105,6 +104,17 @@ updateCarteCitoyen citId coord etat@(Etat {carte = carte}) =
   case Map.lookup coord carte of
     Just (batId, citIds) -> Map.insert coord (batId, citId : citIds) carte
     Nothing -> Map.insert coord (BatId (-1), [citId]) carte -- BatId -1 is a placeholder
+
+-- update coords of a citizen in the map
+updateCarteCitoyenCoord :: Coord -> Coord -> CitId -> Etat -> Map Coord (BatId, [CitId])
+updateCarteCitoyenCoord oldCoord newCoord citId etat = do
+  let updatedCarte = removeCarteCitoyenCoord oldCoord citId etat
+  updateCarteCitoyen citId newCoord etat {carte = updatedCarte}
+
+removeCarteCitoyenCoord :: Coord -> CitId -> Etat -> Map Coord (BatId, [CitId])
+removeCarteCitoyenCoord coord citId etat = case Map.lookup coord (carte etat) of
+  Just (batId, citIds) -> Map.insert coord (batId, filter (/= citId) citIds) (carte etat)
+  Nothing -> carte etat
 
 -- remove a citizen from the carte
 removeCitoyenFromCarte :: CitId -> Etat -> Map Coord (BatId, [CitId])

@@ -359,7 +359,7 @@ negateCoord (C x y) = C (-x) (-y)
 createBuilding :: String -> Coord -> State Etat ()
 createBuilding "Cabane" coord = do
   etat <- St.get
-  let batiment = Cabane (GameData.Rectangle coord 50 50) coord 100 []
+  let batiment = Cabane (GameData.Rectangle coord 50 50) coord 10 []
   -- update menu items ( number of coins it costs to build the building)
   if coins etat >= 80
     then do
@@ -368,7 +368,7 @@ createBuilding "Cabane" coord = do
     else return ()
 createBuilding "Atelier" coord = do
   etat <- St.get
-  let batiment = Atelier (GameData.Rectangle coord 50 50) coord 200 []
+  let batiment = Atelier (GameData.Rectangle coord 50 50) coord 20 []
   if coins etat >= 95
     then do
       let (newStat, _) = createBatiment batiment 95 etat
@@ -376,7 +376,7 @@ createBuilding "Atelier" coord = do
     else return ()
 createBuilding "Epicerie" coord = do
   etat <- St.get
-  let batiment = Epicerie (GameData.Rectangle coord 50 50) coord 200 []
+  let batiment = Epicerie (GameData.Rectangle coord 50 50) coord 20 []
   if coins etat >= 110
     then do
       let (newStat, _) = createBatiment batiment 110 etat
@@ -557,7 +557,7 @@ spawnCitizens :: Etat -> IO Etat
 spawnCitizens etat = do
   let batiments = GameData.getBatiments $ ville etat
   let homes = getHomes batiments
-  let randomDelays = generateRandomDelays 120  
+  let randomDelays = generateRandomDelays 350  
   let etat' = execState (spawnCitizensForHomes homes  randomDelays 0) etat
   return etat'
 

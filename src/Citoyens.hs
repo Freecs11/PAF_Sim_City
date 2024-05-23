@@ -11,6 +11,13 @@ import qualified Data.Set as Set
 import GameData
 
 
+-- -- getter for coords of a citizen
+getCoord :: Citoyen -> Coord
+getCoord (Immigrant coord _ _) = coord
+getCoord (Habitant coord _ _ _) = coord
+getCoord (Emigrant coord _) = coord
+
+
 
 -- -- check if a citizen is at a coordinate
 isCitoyenAt :: Coord -> CitId -> Etat -> Bool
@@ -92,26 +99,22 @@ prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) =
 
 -- smart constructor
 -- create a citizen with a unique id
-createCitoyen :: Citoyen -> Etat -> Etat
-createCitoyen citoyen etat@(Etat {ville = ville}) = 
-    let citoyens = getCitoyens ville
-        citId = CitId (show $ Map.size citoyens)
-        updatedCitoyens = Map.insert citId citoyen citoyens
-        updateCarte = updateCarteCitoyen citId etat
-    in etat {ville = ville {viCit = updatedCitoyens}, carte = updateCarte}
+createCitoyen :: Citoyen -> Etat -> (Etat, CitId)
+createCitoyen citoyen etat@(Etat {ville = ville}) =
+  let citoyens = getCitoyens ville
+      citId = CitId (show $ Map.size citoyens + 1)
+      updatedCitoyens = Map.insert citId citoyen citoyens
+      updatedCarte = updateCarteCitoyen citId (getCoord citoyen) etat
+   in (etat {ville = ville {viCit = updatedCitoyens}, carte = updatedCarte}, citId)
+
 
 -- update the carte with the new citizen
-updateCarteCitoyen :: CitId -> Etat -> Map Coord (BatId, [CitId])
-updateCarteCitoyen citId etat@(Etat {carte = carte}) = 
-    let coord = getCoordCitoyen citId etat
-    in case coord of
-        Just coord' -> 
-            let (batId, citIds) = case Map.lookup coord' carte of
-                    Just x -> x
-                    Nothing -> (BatId 0, []) -- 0 is for people who are have no home
-                updatedCitIds = citId:citIds
-                updatedCarte = Map.insert coord' (batId, updatedCitIds) carte
-            in updatedCarte
+-- update the carte with the new citizen
+updateCarteCitoyen :: CitId -> Coord -> Etat -> Map Coord (BatId, [CitId])
+updateCarteCitoyen citId coord etat@(Etat {carte = carte}) =
+  case Map.lookup coord carte of
+    Just (batId, citIds) -> Map.insert coord (batId, citId : citIds) carte
+    Nothing -> Map.insert coord (BatId (-1), [citId]) carte -- BatId -1 is a placeholder
 
 -- remove a citizen from the carte
 removeCitoyenFromCarte :: CitId -> Etat -> Map Coord (BatId, [CitId])

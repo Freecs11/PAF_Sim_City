@@ -122,6 +122,7 @@ data Event = Move Coord CitId -- évenement pour déplacer un citoyen vers un Co
            | TaxRetreival Int -- évenement pour prélever une taxe sur les citoyens, va juste rajouter des coins à l'état
            | FollowPath [Coord] CitId -- évenement pour faire suivre un chemin à un citoyen 
            | Moving Coord CitId -- move déclenche le pathfinding et moving fait le mouvement
+           | AssignBuildingstoCitizens -- assigne les batiments aux citoyens ( leurs travail, magasin) , la maison est déjà assignée à la création du citoyen
            deriving (Eq, Show)
 
 -- utilisation de la selection pour savoir si on a sélectionné un batiment ou une zone
@@ -130,9 +131,10 @@ data Selection = ZoneType String | BuildingType String | None
 
 
 -- world offset pour déplacer la carte (différencé les coords de la carte et les coords de l'écran)
-data World = World {
-  worldOffset :: Coord
-} deriving (Show, Eq)
+data World = World { worldOffset :: Coord } deriving (Show, Eq)
+
+-- direction de la route (pour le placement des routes)
+data RouteDirection = Horizontal | Vertical deriving (Eq, Show)
 
 
 -- on va stocker les évenements à faire à un temps donné , 
@@ -145,7 +147,10 @@ data Etat =  Etat {
         currentTime :: Int , -- temps actuel du jeu , utilise un entier pour l'instant
         events :: Map Int [Event] ,
         selection :: Selection,
-        world :: World
+        world :: World,
+        routeDirection :: RouteDirection,
+        selectionStart :: Maybe Coord
+        -- mouseHeld :: Bool
     }
     deriving (Show, Eq)
 

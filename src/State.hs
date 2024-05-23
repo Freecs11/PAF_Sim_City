@@ -15,10 +15,15 @@ import Formes
 import GameData
 
 -- Initialize game state with one building (TESTING)
-initialiseStateWithBuilding :: Int -> Etat 
+initialiseStateWithBuilding :: Int -> Etat
 initialiseStateWithBuilding startCoins = Etat {
+  -- ville = Ville {
+  --   viBat = Map.singleton (BatId 1) (Epicerie (GameData.Rectangle (C 100 100) 50 50) (C 100 100) 10 []),
+  --   viCit = Map.empty,
+  --   viZones = Map.singleton (ZonId 1) (Route (GameData.Rectangle (C 110 110) 10 120))
+  -- },
   ville = Ville {
-    viBat = Map.singleton (BatId 1) (Epicerie (GameData.Rectangle (C 100 100) 50 50) (C 100 100) 10 []),
+    viBat = Map.empty,
     viCit = Map.empty,
     viZones = Map.empty
   },
@@ -27,8 +32,11 @@ initialiseStateWithBuilding startCoins = Etat {
   currentTime = 0,
   events = Map.empty,
   selection = None,
-  world = World { worldOffset = C 0 0 }
+  world = World { worldOffset = C 0 0 },
+  routeDirection = Horizontal,
+  selectionStart = Nothing
 }
+
 
 getSelectedBuilding :: Etat -> Selection
 getSelectedBuilding (Etat {selection = selection}) = selection
@@ -103,7 +111,9 @@ processEvent event = case event of
     scheduleEvent (currentTime state + 1000) (FollowPath remainingPath citId)
   FollowPath [] _ -> return () -- Path is complete, do nothing
   TaxRetreival amount -> taxRetreival amount
+  AssignBuildingstoCitizens -> assignBuildingstoCitizens
   _ -> return ()
+  
 
 -- fonction pour géré la taxe sur les citoyens
 -- elle collecte une taxe sur chaque citoyen de la ville et l'ajoute à la caisse de la ville ( les coins du joueur)
@@ -123,7 +133,7 @@ taxRetreival amount = do
           state
           citoyens
   put newState
-  scheduleEvent (currentTime newState + 10000000) (TaxRetreival amount)
+  scheduleEvent (currentTime newState + 1000) (TaxRetreival amount)
 
 -- Event processing functions that concern citizens
 -- will calculate the path to the citizen's home and schedule the event to follow it
@@ -153,3 +163,51 @@ updateCitizenCoord :: Coord -> Citoyen -> Citoyen
 updateCitizenCoord newCoord (Immigrant _ stats occ) = Immigrant newCoord stats occ
 updateCitizenCoord newCoord (Habitant _ stats b occ) = Habitant newCoord stats b occ
 updateCitizenCoord newCoord (Emigrant _ occ) = Emigrant newCoord occ
+
+
+
+-- Assign citizens to buildings
+-- assign to Habitants their work, and their shopping destination if possible
+assignBuildingstoCitizens :: State Etat ()
+assignBuildingstoCitizens = do
+  state <- get
+  let citoyens = getCitoyens (ville state) -- Map CitId Citoyen
+  let batiments = getBatiments (ville state) -- Map BatId Batiment
+
+  -- assign work to Habitants (if they don't have one already)
+  let habitants = Map.filter (\cit -> case cit of
+        Habitant _ _ _ _ -> True
+        _ -> False) citoyens 
+  let habitantIds = Map.keys habitants
+  let workBatIds = Map.keys $ Map.filter (\bat -> case bat of
+        Atelier _ _ _ _ -> True
+        _ -> False) batiments
+  let workBatIds' = cycle workBatIds
+  let habitantWorkAssignments = zip habitantIds workBatIds'
+
+  let newCitoyensWithWork = foldr (\ (citId, batId) acc ->
+          case Map.lookup citId acc of
+            Just (Habitant coord stats (home , _,shop) occ) -> Map.insert citId (Habitant coord stats (home, Just batId, shop) occ) acc
+            _ -> acc) citoyens habitantWorkAssignments
+
+  -- assign shopping destinations to Habitants (if they don't have one already)
+  let habitants' = Map.filter (\cit -> case cit of
+        Habitant _ _ _ _ -> True
+        _ -> False ) newCitoyensWithWork
+  let habitantIds' = Map.keys habitants'
+  let shoppingBatIds = Map.keys $ Map.filter (\bat -> case bat of
+        Epicerie _ _ _ _ -> True
+        _ -> False ) batiments
+  let shoppingBatIds' = cycle shoppingBatIds
+  let habitantShoppingAssignments = zip habitantIds' shoppingBatIds'
+
+  let newCitoyensWithShopping = foldr (
+        \ (citId, batId) acc ->
+          case Map.lookup citId acc of
+            Just (Habitant coord stats (home,work,shop) occ) -> Map.insert citId (Habitant coord stats (home,work,Just batId) occ) acc
+            _ -> acc ) newCitoyensWithWork habitantShoppingAssignments
+
+  put $ state { ville = (ville state) { viCit = newCitoyensWithShopping } }
+
+
+  

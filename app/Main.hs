@@ -516,14 +516,17 @@ createStructure "ZoneRoute" coord mouseEvent events = do
         case (routeDirection etat) of
           Horizontal -> do
             let forme = routeFormeHoriz startCoord (cx coord - cx startCoord)
-            if any (\zone -> collision forme (zoneForme zone)) (Map.elems $ viZones $ ville etat) && (coins etat >= 5)
+            if any (\zone -> appartient (getFormeCoord forme) (zoneForme zone)) (Map.elems $ viZones $ ville etat) && (coins etat >= 10)
               then return ()
-              else put $ createZone (Route forme) 5 etat
+              else
+                put $ createZone (Route forme) 10 etat
           Vertical -> do
             let forme = routeFormeVert startCoord (cy coord - cy startCoord)
-            if any (\zone -> collision forme (zoneForme zone)) (Map.elems $ viZones $ ville etat) && (coins etat >= 5)
+            if any (\zone -> appartient (getFormeCoord forme) (zoneForme zone)) (Map.elems $ viZones $ ville etat) && (coins etat >= 10)
               then return ()
-              else put $ createZone (Route forme) 5 etat
+              else
+                put $ createZone (Route forme) 10 etat
+
       Nothing -> return ()
 createStructure "ZoneR" coord mouseEvent events = handleZoneCreation ZTR coord mouseEvent events
 createStructure "ZoneI" coord mouseEvent events = handleZoneCreation ZTI coord mouseEvent events

@@ -52,7 +52,7 @@ isZoneValid zone etat@(Etat {ville = ville}) =
     let zones = getZones ville
         validity = case zone of
             Eau forme -> not (elem zone zones)
-            Route forme -> not (elem zone zones)
+            Route forme -> not (elem zone zones) && isDisjointWithMargin forme zones
             ZR forme _ -> trace ("Disjoint: " ++ show (isDisjointWithMargin forme zones) ++ ", Adjacent: " ++ show (isZoneAdjacentToRoute forme zones))
                 (isDisjointWithMargin forme zones && isZoneAdjacentToRoute forme zones)
             ZI forme _ -> isDisjointWithMargin forme zones && isZoneAdjacentToRoute forme zones

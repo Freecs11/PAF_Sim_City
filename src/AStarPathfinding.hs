@@ -14,6 +14,12 @@ import GameData
 import Zone (getRoutesCoords)
 import Control.Monad.State (State, get, put, modify)
 
+
+-- A* search algorithm
+-- Based on the implementation from  https://notes.abhinavsarkar.net/2022/astar
+-- modified to work with the game data structures and also to use cache for memoization
+
+
 data Node = Node
   { coord :: Coord,
     gCost :: Int,

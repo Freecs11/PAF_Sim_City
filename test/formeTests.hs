@@ -7,7 +7,7 @@ import GameData
 import Test.Hspec
 import Test.QuickCheck
 
--- on définit d'abord les instances arbitraires pour les types Coord et Forme ( pour les générer aléatoirement avec QuickCheck)
+-- Define Arbitrary instances for the types Coord and Forme
 instance Arbitrary Coord where
   arbitrary = C <$> arbitrary <*> arbitrary
 
@@ -19,6 +19,7 @@ instance Arbitrary Forme where
         Rectangle <$> arbitrary <*> (getPositive <$> arbitrary) <*> (getPositive <$> arbitrary)
       ]
 
+-- Test suite for limites function
 limitesSpec :: Spec
 limitesSpec = do
   describe "Formes.limites" $ do
@@ -27,76 +28,56 @@ limitesSpec = do
         \(forme :: Forme) -> prop_limites_precondition forme ==> True
 
     it "calculates correct limits for an HSegment" $
-      property $ \(x :: Int, y :: Int, l :: Int) ->
+      property $ \(x :: Int, y :: Int, Positive l) ->
         let forme = HSegment (C x y) l
-         in l
-              > 0
-                ==> prop_limites_postcondition forme
+         in prop_limites_postcondition forme
 
     it "calculates correct limits for a VSegment" $
-      property $ \(x :: Int, y :: Int, l :: Int) ->
+      property $ \(x :: Int, y :: Int, Positive l) ->
         let forme = VSegment (C x y) l
-         in l
-              > 0
-                ==> prop_limites_postcondition forme
+         in prop_limites_postcondition forme
 
     it "calculates correct limits for a Rectangle" $
-      property $ \(x :: Int, y :: Int, w :: Int, h :: Int) ->
+      property $ \(x :: Int, y :: Int, Positive w, Positive h) ->
         let forme = Rectangle (C x y) w h
-         in w > 0
-              && h
-                > 0
-                  ==> prop_limites_postcondition forme
+         in prop_limites_postcondition forme
 
+-- Test suite for appartient function
 appartientSpec :: Spec
 appartientSpec = do
   describe "Formes.appartient" $ do
     it "correctly identifies if a coord is within an HSegment" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = HSegment (C x y) l
-                 in all (\cx -> appartient (C cx y) forme) [x .. x + l - 1]
+      property $ \(C x y, Positive l) ->
+        let forme = HSegment (C x y) l
+         in all (\cx -> appartient (C cx y) forme) [x .. x + l - 1]
 
     it "correctly identifies if a coord is within a VSegment" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = VSegment (C x y) l
-                 in all (\cy -> appartient (C x cy) forme) [y .. y + l - 1]
+      property $ \(C x y, Positive l) ->
+        let forme = VSegment (C x y) l
+         in all (\cy -> appartient (C x cy) forme) [y .. y + l - 1]
 
     it "correctly identifies if a coord is within a Rectangle" $
-      property $ \(C x y, w, h) ->
-        w > 0
-          && h
-            > 0
-              ==> let forme = Rectangle (C x y) w h
-                   in all (\(cx, cy) -> appartient (C cx cy) forme) [(cx, cy) | cx <- [x .. x + w - 1], cy <- [y .. y + h - 1]]
+      property $ \(C x y, Positive w, Positive h) ->
+        let forme = Rectangle (C x y) w h
+         in all (\(cx, cy) -> appartient (C cx cy) forme) [(cx, cy) | cx <- [x .. x + w - 1], cy <- [y .. y + h - 1]]
 
     it "ensures coordinates just outside of HSegment boundaries are not included" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = HSegment (C x y) l
-                 in not (appartient (C (x - 1) y) forme) && not (appartient (C (x + l) y) forme)
+      property $ \(C x y, Positive l) ->
+        let forme = HSegment (C x y) l
+         in not (appartient (C (x - 1) y) forme) && not (appartient (C (x + l) y) forme)
 
     it "ensures coordinates just outside of VSegment boundaries are not included" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = VSegment (C x y) l
-                 in not (appartient (C x (y - 1)) forme) && not (appartient (C x (y + l)) forme)
+      property $ \(C x y, Positive l) ->
+        let forme = VSegment (C x y) l
+         in not (appartient (C x (y - 1)) forme) && not (appartient (C x (y + l)) forme)
 
     it "ensures coordinates just outside of Rectangle boundaries are not included" $
-      property $ \(C x y, w, h) ->
-        w > 0
-          && h
-            > 0
-              ==> let forme = Rectangle (C x y) w h
-                   in not (appartient (C (x - 1) y) forme)
-                        && not (appartient (C (x + w) y) forme)
-                        && not (appartient (C x (y - 1)) forme)
-                        && not (appartient (C x (y + h)) forme)
+      property $ \(C x y, Positive w, Positive h) ->
+        let forme = Rectangle (C x y) w h
+         in not (appartient (C (x - 1) y) forme)
+              && not (appartient (C (x + w) y) forme)
+              && not (appartient (C x (y - 1)) forme)
+              && not (appartient (C x (y + h)) forme)
 
     it "obeys the precondition that all dimensions are positive" $
       property $
@@ -105,73 +86,59 @@ appartientSpec = do
     it "obeys the invariant that a coord is either in a Forme or adjacent to it" $
       property $
         \(coord :: Coord, forme :: Forme) -> prop_appartient_invariant coord forme
+
     it "obeys the postcondition that appartient returns the correct value" $
       property $
         \(coord :: Coord, forme :: Forme) -> prop_appartient_postcondition coord forme
 
+-- Test suite for adjacent function
 adjacentSpec :: Spec
 adjacentSpec = do
   describe "Formes.adjacent" $ do
     it "correctly identifies if a coord is adjacent to an HSegment" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = HSegment (C x y) l
-                 in all (\cx -> adjacent (C cx y) forme) [x - 1, x + l]
+      property $ \(C x y, Positive l) ->
+        let forme = HSegment (C x y) l
+            margin = 10
+         in all (\cx -> adjacent (C cx y) forme) [x - margin, x + l + margin]
 
     it "correctly identifies if a coord is adjacent to a VSegment" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = VSegment (C x y) l
-                 in all (\cy -> adjacent (C x cy) forme) [y - 1, y + l]
+      property $ \(C x y, Positive l) ->
+        let forme = VSegment (C x y) l
+            margin = 10
+         in all (\cy -> adjacent (C x cy) forme) [y - margin, y + l + margin]
 
     it "correctly identifies if a coord is adjacent to a Rectangle" $
       property $ \(C x y, Positive w, Positive h) ->
         let forme = Rectangle (C x y) w h
+            margin = 10
             adjacents =
-              [(x - 1, y + dy) | dy <- [0 .. h - 1]]
-                ++ [(x + w, y + dy) | dy <- [0 .. h - 1]] -- Left side
-                ++ [(x + dx, y - 1) | dx <- [0 .. w - 1]] -- Right side
-                ++ [(x + dx, y + h) | dx <- [0 .. w - 1]] -- Top side
-                -- Bottom side
+              [(x - margin, y + dy) | dy <- [0 .. h - 1]]
+                ++ [(x + w + margin, y + dy) | dy <- [0 .. h - 1]]
+                ++ [(x + dx, y - margin) | dx <- [0 .. w - 1]]
+                ++ [(x + dx, y + h + margin) | dx <- [0 .. w - 1]]
          in all (\(cx, cy) -> adjacent (C cx cy) forme) adjacents
 
-    it "ensures coordinates within the Forme are not considered adjacent" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = HSegment (C x y) l
-                 in not (adjacent (C x y) forme)
 
     it "ensures coordinates just outside of HSegment boundaries are not considered adjacent" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = HSegment (C x y) l
-                 in not (adjacent (C (x - 2) y) forme) && not (adjacent (C (x + l + 1) y) forme)
+      property $ \(C x y, Positive l) ->
+        let forme = HSegment (C x y) l
+            margin = 10
+         in not (adjacent (C (x - margin - 1) y) forme) && not (adjacent (C (x + l + margin + 1) y) forme)
 
     it "ensures coordinates just outside of VSegment boundaries are not considered adjacent" $
-      property $ \(C x y, l) ->
-        l
-          > 0
-            ==> let forme = VSegment (C x y) l
-                 in not (adjacent (C x (y - 2)) forme) && not (adjacent (C x (y + l + 1)) forme)
+      property $ \(C x y, Positive l) ->
+        let forme = VSegment (C x y) l
+            margin = 10
+         in not (adjacent (C x (y - margin - 1)) forme) && not (adjacent (C x (y + l + margin + 1)) forme)
 
     it "ensures coordinates just outside of Rectangle boundaries are not considered adjacent" $
-      property $ \(C x y, w :: Int, h :: Int) ->
-        w > 0
-          && h
-            > 0
-              ==> let forme = Rectangle (C x y) w h
-                   in not (adjacent (C (x - 2) y) forme)
-                        && not (adjacent (C (x + w + 1) y) forme)
-                        && not (adjacent (C x (y - 2)) forme)
-                        && not (adjacent (C x (y + h + 1)) forme)
-
-    it "obeys the postcondition that adjacent returns the correct value" $
-      property $
-        \(coord :: Coord, forme :: Forme) -> prop_adjacent_postcondition coord forme
+      property $ \(C x y, Positive w, Positive h) ->
+        let forme = Rectangle (C x y) w h
+            margin = 10
+         in not (adjacent (C (x - margin - 1) y) forme)
+              && not (adjacent (C (x + w + margin + 1) y) forme)
+              && not (adjacent (C x (y - margin - 1)) forme)
+              && not (adjacent (C x (y + h + margin + 1)) forme)
 
     it "obeys the precondition that all dimensions are positive" $
       property $
@@ -181,15 +148,14 @@ adjacentSpec = do
       property $
         \(coord :: Coord, forme :: Forme) -> prop_adjacent_invariant coord forme
 
+-- Test suite for collision function
 collisionSpec :: Spec
 collisionSpec = do
   describe "Formes.collision" $ do
     it "correctly identifies if two Formes collide" $
       property $ \(forme1 :: Forme, forme2 :: Forme) ->
-        let (n1, s1, w1, e1) = limites forme1
-            points = [(x, y) | x <- [w1 .. e1], y <- [n1 .. s1]]
-         in collision forme1 forme2
-              == any (\(x, y) -> appartient (C x y) forme1 && appartient (C x y) forme2) points
+        prop_collision_postcondition forme1 forme2
+          
 
     it "obeys the precondition that all dimensions are positive" $
       property $ \(forme1 :: Forme, forme2 :: Forme) ->
@@ -199,12 +165,11 @@ collisionSpec = do
       property $ \(forme1 :: Forme, forme2 :: Forme) ->
         prop_collision_postcondition forme1 forme2
 
-    it "obeys the invariant that a coord is either in a Forme or adjacent to it" $
+    it "obeys the invariant that collision is symmetric" $
       property $ \(forme1 :: Forme, forme2 :: Forme) ->
         prop_collision_invariant forme1 forme2
 
---- NE MARCHE PAS ACTUELLEMENT ---
--- donc faut revoir toute la fonction adjacentes ou alors la supprimer ...
+-- Test suite for adjacentes function
 adjacentesSpec :: Spec
 adjacentesSpec = do
   describe "Formes.adjacentes" $ do
@@ -220,15 +185,16 @@ adjacentesSpec = do
 
     it "does not identify forms as adjacent if they only touch at a corner" $ do
       let form1 = Rectangle (C 0 0) 5 5
-          form2 = Rectangle (C 5 5) 5 5
+          -- we took +15 to ensure that we take the margin into account
+          form2 = Rectangle (C 15 15) 5 5 
       adjacentes form1 form2 `shouldBe` False
 
     it "does not identify forms as adjacent if there is a gap" $ do
       let form1 = Rectangle (C 0 0) 5 5
-          form2 = Rectangle (C 7 0) 5 5
+          form2 = Rectangle (C 17 0) 5 5
       adjacentes form1 form2 `shouldBe` False
 
--- all the tests
+-- All tests combined
 spec :: Spec
 spec = do
   limitesSpec

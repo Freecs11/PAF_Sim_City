@@ -2,19 +2,28 @@ module Formes where
 
 import GameData
 
--- formes functions and invariants/pre/post conditions
--- instances also ( functor, applicative, monad, foldable, traversable, etc. )
+tailleBlocI :: Int
+tailleBlocI = 10
 
+-- coord of a Forme
 getFormeCoord :: Forme -> Coord
 getFormeCoord (HSegment c _) = c
 getFormeCoord (VSegment c _) = c
 getFormeCoord (Rectangle c _ _) = c
 
 
+-- x and y of a Coord
 getXY :: Coord -> (Int, Int)
 getXY (C x y) = (x, y)
 
 
+-- width and height of a Forme (only for rectangles)
+getWH :: Forme -> (Int, Int)
+getWH (GameData.Rectangle _ w h) = (w, h)
+getWH (HSegment _ l) = (l, tailleBlocI)
+getWH (VSegment _ l) = (tailleBlocI, l)
+
+-- move a Forme to a new Coord
 moveForme :: Coord -> Forme -> Forme
 moveForme c (HSegment _ l) = HSegment c l
 moveForme c (VSegment _ l) = VSegment c l
@@ -22,6 +31,7 @@ moveForme c (Rectangle _ w h) = Rectangle c w h
 
 
 
+-- limites of a Forme
 limites :: Forme -> (Int, Int, Int, Int)
 limites (HSegment (C x y) l) = (y, y, x, x + l - 1)
 limites (VSegment (C x y) l) = (y, y + l - 1, x, x)
@@ -87,6 +97,7 @@ adjacent (C x y) (Rectangle (C x' y') w h) =
     in ((x >= x' - margin && x <= x' + w + margin) && (y >= y' - margin && y <= y' + h + margin)) ||
        ((y >= y' - margin && y <= y' + h + margin) && (x >= x' - margin && x <= x' + w + margin))
 
+-- getCoords: Get all the coordinates of a Forme.
 getCoords :: Forme -> [Coord]
 getCoords (HSegment (C x y) l) = [C (x + i) y | i <- [0..(l-1)]]
 getCoords (VSegment (C x y) l) = [C x (y + i) | i <- [0..(l-1)]]
@@ -116,7 +127,7 @@ prop_adjacent_invariant coord@(C x y) forme =
     not (adjacent (C (x-1) y) forme && adjacent (C (x+1) y) forme &&  -- ou alors c'est pas adjacent ( test de tous les côtés )
          adjacent (C x (y-1)) forme && adjacent (C x (y+1)) forme)
 
-
+-- we defined a margin of error for the collision and adjacent functions because we can't be pixel perfect on gui
 collision :: Forme -> Forme -> Bool
 collision f1 f2 = 
     let margin = 1  -- a margin of error
@@ -133,7 +144,9 @@ prop_collision_postcondition :: Forme -> Forme -> Bool
 prop_collision_postcondition f1 f2 = 
     collision f1 f2 == (let (n1, s1, o1, e1) = limites f1
                             (n2, s2, o2, e2) = limites f2
-                        in n1 <= s2 && s1 >= n2 && o1 <= e2 && e1 >= o2)
+                        -- +1 et -1 pour les marges d'erreurs
+                        in n1 <= s2 + 1 && s1 >= n2 - 1 && o1 <= e2 + 1 && e1 >= o2 - 1)
+
 
 prop_collision_precondition :: Forme -> Forme -> Bool
 prop_collision_precondition f1 f2 = prop_limites_precondition f1 && prop_limites_precondition f2

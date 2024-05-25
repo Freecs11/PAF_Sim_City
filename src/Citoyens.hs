@@ -6,13 +6,13 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GameData
 
--- -- getter for coords of a citizen
+-- getter for coords of a citizen
 getCoord :: Citoyen -> Coord
 getCoord (Immigrant coord _ _) = coord
 getCoord (Habitant coord _ _ _) = coord
 getCoord (Emigrant coord _) = coord
 
--- -- check if a citizen is at a coordinate
+-- check if a citizen is at a coordinate
 isCitoyenAt :: Coord -> CitId -> Etat -> Bool
 isCitoyenAt coord citId (Etat {ville = ville}) =
   let citoyens = getCitoyens ville
@@ -23,9 +23,9 @@ isCitoyenAt coord citId (Etat {ville = ville}) =
           Emigrant coord' _ -> coord == coord'
         Nothing -> False
 
--- -- verify if the Coord and CitId of the state are coherent
--- -- meaning that the citizen at the coord in Carte has the same citId
--- -- as the one in the state
+-- vérifie si les coordonnées et les CitId de l'état sont cohérents
+-- ce qui signifie que le citoyen aux coordonnées dans Carte a le même citId
+-- que celui dans l'état
 prop_carte_coords_valid_Ville :: Etat -> Bool
 prop_carte_coords_valid_Ville etat@(Etat {ville = ville, carte = carte}) =
   Map.foldrWithKey step True carte
@@ -33,7 +33,7 @@ prop_carte_coords_valid_Ville etat@(Etat {ville = ville, carte = carte}) =
     step :: Coord -> (BatId, [CitId]) -> Bool -> Bool
     step coord (_, citIds) acc = acc && all (\citId -> isCitoyenAt coord citId etat) citIds
 
--- -- check if map has a citizen at a coordinate
+-- regarde si la carte a un citoyen à une coordonnée
 hasCitoyenAt :: CitId -> Etat -> Bool
 hasCitoyenAt citId etat@(Etat {ville = ville, carte = c}) =
   let citoyens = getCitoyens ville
@@ -44,14 +44,14 @@ hasCitoyenAt citId etat@(Etat {ville = ville, carte = c}) =
           Emigrant coord _ -> lookUpCarteWithCitID coord etat citId
         Nothing -> False
 
--- -- lookup if the citizen at a coordinate in the carte match the citId
+-- regarde si le citoyen à une coordonnée dans la carte correspond au citId
 lookUpCarteWithCitID :: Coord -> Etat -> CitId -> Bool
 lookUpCarteWithCitID coord (Etat {carte = carte}) citId =
   case Map.lookup coord carte of
     Just (_, citIds) -> elem citId citIds
     Nothing -> False
 
--- -- get the citizen at a coordinate ( we take the first citizen in the list)
+-- récupère un citoyen à une coordonnée (on prend le premier citoyen de la liste)
 getCitoyenAt :: Coord -> Etat -> Maybe CitId
 getCitoyenAt coord (Etat {carte = carte}) =
   case Map.lookup coord carte of
@@ -60,7 +60,7 @@ getCitoyenAt coord (Etat {carte = carte}) =
       (citId : _) -> Just citId
     Nothing -> Nothing
 
--- get the coordinates of a citizen
+-- recupère les coordonnées d'un citoyen
 getCoordCitoyen :: CitId -> Etat -> Maybe Coord
 getCoordCitoyen citId (Etat {ville = ville}) =
   let citoyens = getCitoyens ville
@@ -71,7 +71,7 @@ getCoordCitoyen citId (Etat {ville = ville}) =
           Emigrant coord _ -> Just coord
         Nothing -> Nothing
 
--- verify if all the citizens have coherent coords with the carte of the state
+-- vérifie si les coordonnées des citoyens sont cohérentes avec la carte de l'état
 prop_carteCoordCit_inv :: Etat -> Bool
 prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) =
   let citoyens = getCitoyens ville
@@ -88,7 +88,7 @@ prop_carteCoordCit_inv etat@(Etat {ville = ville, carte = carte}) =
         Nothing -> False
 
 -- smart constructor
--- create a citizen with a unique id
+-- créé un citoyen si il est valide , il retourne l'état mis à jour et le citId du citoyen
 createCitoyen :: Citoyen -> Etat -> (Etat, CitId)
 createCitoyen citoyen etat@(Etat {ville = ville}) =
   let citoyens = getCitoyens ville
@@ -97,26 +97,26 @@ createCitoyen citoyen etat@(Etat {ville = ville}) =
       updatedCarte = updateCarteCitoyen citId (getCoord citoyen) etat
    in (etat {ville = ville {viCit = updatedCitoyens}, carte = updatedCarte}, citId)
 
--- update the carte with the new citizen
--- update the carte with the new citizen
+-- update la carte avec le nouveau citoyen
 updateCarteCitoyen :: CitId -> Coord -> Etat -> Map Coord (BatId, [CitId])
 updateCarteCitoyen citId coord etat@(Etat {carte = carte}) =
   case Map.lookup coord carte of
     Just (batId, citIds) -> Map.insert coord (batId, citId : citIds) carte
     Nothing -> Map.insert coord (BatId (-1), [citId]) carte -- BatId -1 is a placeholder
 
--- update coords of a citizen in the map
+-- update la carte avec le nouveau citoyen
 updateCarteCitoyenCoord :: Coord -> Coord -> CitId -> Etat -> Map Coord (BatId, [CitId])
 updateCarteCitoyenCoord oldCoord newCoord citId etat = do
   let updatedCarte = removeCarteCitoyenCoord oldCoord citId etat
   updateCarteCitoyen citId newCoord etat {carte = updatedCarte}
 
+-- remove a citizen from the carte at a specific coordinate ( on va dans coord de la carte et on enlève le citId  )
 removeCarteCitoyenCoord :: Coord -> CitId -> Etat -> Map Coord (BatId, [CitId])
 removeCarteCitoyenCoord coord citId etat = case Map.lookup coord (carte etat) of
   Just (batId, citIds) -> Map.insert coord (batId, filter (/= citId) citIds) (carte etat)
   Nothing -> carte etat
 
--- remove a citizen from the carte
+-- remove a citizen from the carte ( on cherche le citId et on l'enlève)
 removeCitoyenFromCarte :: CitId -> Etat -> Map Coord (BatId, [CitId])
 removeCitoyenFromCarte citId etat@(Etat {carte = carte}) =
   let coord = getCoordCitoyen citId etat
@@ -150,3 +150,9 @@ getOccupationCitoyen citId (Etat {ville = ville}) =
       Immigrant _ _ occ -> Just occ
       Habitant _ _ _ occ -> Just occ
       Emigrant _ occ -> Just occ
+
+-- invariant sur le citoyen (les coordonnées et les citId sont cohérents avec la carte et la ville)
+prop_inv_Citoyen :: Etat -> Bool
+prop_inv_Citoyen etat = prop_carte_coords_valid_Ville etat && prop_carteCoordCit_inv etat
+
+

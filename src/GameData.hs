@@ -18,9 +18,6 @@ data Coord = C
 instance Ord Coord where
   compare (C x1 y1) (C x2 y2) = compare (x1, y1) (x2, y2)
 
--- -- Distance between two points
--- distance :: Coord -> Coord -> Int
--- distance (C x1 y1) (C x2 y2) = abs (x1 - x2) + abs (y1 - y2)
 
 -- Form of a building or a zone
 data Forme
@@ -102,24 +99,25 @@ data Ville = Ville
   }
   deriving (Show, Eq)
 
+-- Getters for Ville
 getZones :: Ville -> Map ZonId Zone
 getZones (Ville {viZones = z}) = z
-
 getBatiments :: Ville -> Map BatId Batiment
 getBatiments (Ville {viBat = b}) = b
-
 getCitoyens :: Ville -> Map CitId Citoyen
 getCitoyens (Ville {viCit = c}) = c
 
+-- PathfindingRequest est utilisé pour demander un pathfinding au système de pathfinding (utilisé comme un système de 'batching' pour éviter de lancer A* pour de nombreux citoyens en même temps)
 data PathfindingRequest = PathfindingRequest CitId Coord deriving (Eq, Show)
 
--- Queue to handle pathfinding requests
+-- Queue pour les pathfinding requests
 type PathfindingQueue = [PathfindingRequest] 
 
+-- Event data type, utilisé pour géré les évenements dans le jeu
 data Event
   = Move PathfindingQueue
   | GoWork CitId -- commence le travaille , va rajouté dans l'état le temps de fin de travail du citoyen comme currentTime + temps de travail
-  -- comme ça si le temps de travail est fini on peut le faire rentrer chez lui en rajoutant un autre évenement GoHome
+  -- comme ça si le temps de travail est fini on peut le faire rentrer chez lui ou autre en rajoutant un autre évenement GoHome
   | GoShopping CitId -- commence le shopping, meme principe que StartWork
   | GoHome CitId -- rentre chez lui , il signifie que le citoyen a fini son travail ou son shopping et qu'il rentre chez lui directement ( suivant le chemin le plus court)
   | UpdateMoney CitId -- met à jour l'argent du citoyen
@@ -133,14 +131,14 @@ data Event
   | PlaceRoute Coord  -- place une route à la coordonnée donnée
   deriving (Eq, Show)
 
--- utilisation de la selection pour savoir si on a sélectionné un batiment ou une zone
+-- utilisation de la selection pour savoir si on a sélectionné un batiment ou une zone ou rien ( ce que le joueur a sélectionné en dernier)
 data Selection = ZoneType String | BuildingType String | None
   deriving (Show, Eq)
 
 -- world offset pour déplacer la carte (différencé les coords de la carte et les coords de l'écran)
 data World = World {worldOffset :: Coord} deriving (Show, Eq)
 
--- direction de la route (pour le placement des routes)
+-- direction de la route (pour le placement des routes) R pour switcher entre horizontal et vertical
 data RouteDirection = Horizontal | Vertical deriving (Eq, Show)
 
 -- on va stocker les évenements à faire à un temps donné ,
@@ -156,14 +154,14 @@ data Etat = Etat
     world :: World,
     routeDirection :: RouteDirection,
     selectionStart :: Maybe Coord,
-    pathCache :: Map (Coord, Coord) (Int, [Coord]), -- Add path cache
+    pathCache :: Map (Coord, Coord) (Int, [Coord]), -- ajoute un cache pour les paths
     pathfindingQueue :: PathfindingQueue
     -- mouseHeld :: Bool
   }
   deriving (Show, Eq)
 
+-- Getters for Etat
 getCarte :: Etat -> Map Coord (BatId, [CitId])
 getCarte (Etat {carte = c}) = c
-
 getBatimentsIDs :: Ville -> [BatId]
 getBatimentsIDs (Ville {viBat = b}) = Map.keys b

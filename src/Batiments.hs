@@ -22,7 +22,7 @@ import qualified SDL.Video.Renderer as R
 import Sprite
 import TextureMap
 
--- TOCHANGE
+
 -- récupère tous les coordonéés de tous les batiments
 getBatimentsCoords :: Etat -> [Coord]
 getBatimentsCoords (Etat {ville = ville}) =
@@ -32,7 +32,7 @@ getBatimentsCoords (Etat {ville = ville}) =
     step :: BatId -> Batiment -> [Coord] -> [Coord]
     step batId batiment acc = (getBatimentCoord batiment) : acc
 
--- check if a building is at a coordinate
+-- regarde si un batiment est à une coordonnée donnée 
 isBatimentAt :: Coord -> BatId -> Etat -> Bool
 isBatimentAt coord batId (Etat {ville = ville}) =
   let batiments = getBatiments ville
@@ -40,16 +40,16 @@ isBatimentAt coord batId (Etat {ville = ville}) =
         Just batiment -> (getBatimentCoord batiment) == coord
         Nothing -> False
 
--- verify if the Coord and BatId of the state are coherent
--- meaning that the building at the coord in Carte has the same batId
--- as the one in the state
+-- vérifie si les coordonnées et les BatId de l'état sont cohérents
+-- ce qui signifie que le bâtiment aux coordonnées dans Carte a le même batId
+-- que celui dans l'état
 prop_carte_coords_valid_Ville :: Etat -> Bool
 prop_carte_coords_valid_Ville etat@(Etat {ville = ville, carte = carte}) = Map.foldrWithKey step True carte
   where
     step :: Coord -> (BatId, [CitId]) -> Bool -> Bool
     step coord (batId, _) acc = acc && isBatimentAt coord batId etat
 
--- check if map has a building at a coordinate
+-- regarde si la carte a un bâtiment à une coordonnée
 hasBatimentAt :: BatId -> Etat -> Bool
 hasBatimentAt batId etat@(Etat {ville = ville, carte = c}) =
   let batiments = getBatiments ville
@@ -61,14 +61,14 @@ hasBatimentAt batId etat@(Etat {ville = ville, carte = c}) =
           Commissariat _ coord -> lookUpCarteWithBatID coord etat batId
         Nothing -> False
 
--- lookup if the building at a coordinate in the carte match the batId
+-- regarde si le bâtiment à une coordonnée dans la carte correspond au batId
 lookUpCarteWithBatID :: Coord -> Etat -> BatId -> Bool
 lookUpCarteWithBatID coord (Etat {carte = carte}) batId = case Map.lookup coord carte of
   Just (batId', _) -> batId == batId'
   Nothing -> False
 
--- verify if all the buildings have coherent coords with the carte of the state
--- meaning that the carte has the same batId as the building at the same coord
+-- vérifie si tous les bâtiments ont des coordonnées cohérentes avec la carte de l'état
+-- ce qui signifie que la carte a le même batId que le bâtiment à la même coordonnée
 prop_carteCoordBat_inv :: Etat -> Bool
 prop_carteCoordBat_inv etat@(Etat {ville = ville, carte = carte}) =
   let batiments = getBatiments ville
@@ -77,7 +77,8 @@ prop_carteCoordBat_inv etat@(Etat {ville = ville, carte = carte}) =
     step :: BatId -> Batiment -> Bool -> Bool
     step batId batiment acc = acc && hasBatimentAt batId etat
 
--- -- smaert constructor
+-- smaert constructor
+-- crée un bâtiment si il est valide , il retourne l'état mis à jour et le batId du bâtiment
 createBatiment :: Batiment -> Int -> Etat -> (Etat, BatId)
 createBatiment batiment cost etat@(Etat {ville = ville}) =
   case isBatimentValid batiment etat of
@@ -88,8 +89,9 @@ createBatiment batiment cost etat@(Etat {ville = ville}) =
        in (etat {ville = ville {viBat = updatedBatiments}, coins = (coins etat) - cost}, batId)
     False -> (etat, BatId 0)
 
--- buildings are valid if they are not already in the city
--- and if they are disjoint from the buildings already in the city and also are in a zone that is a ZR, ZI or ZC
+
+-- les bâtiments sont valides s'ils ne sont pas déjà dans la ville
+-- et s'ils sont disjoints des bâtiments déjà dans la ville et s'ils sont dans une zone qui est une ZR, ZI ou ZC
 isBatimentValid :: Batiment -> Etat -> Bool
 isBatimentValid batiment etat@(Etat {ville = ville}) =
   let batiments = getBatiments ville
@@ -99,7 +101,7 @@ isBatimentValid batiment etat@(Etat {ville = ville}) =
         Epicerie forme coord _ _ -> not (elem batiment batiments) && isBatimentDisjoint forme batiments && isBatimentInZone batiment etat
         Commissariat forme coord -> not (elem batiment batiments) && isBatimentDisjoint forme batiments && isBatimentInZone batiment etat
 
--- check if a building is disjoint from the other buildings
+-- regarde si un bâtiment est disjoint des autres bâtiments 
 isBatimentDisjoint :: Forme -> Map BatId Batiment -> Bool
 isBatimentDisjoint forme batiments =
   let coords = getCoords forme
@@ -109,7 +111,7 @@ isBatimentDisjoint forme batiments =
         True
         (Map.elems batiments)
 
--- check if a building is in a zone that is a ZR, ZI or ZC
+-- regarde si un bâtiment est dans une zone est correcte : ZR pour les cabanes, ZI pour les ateliers et ZC pour les épiceries etc
 isBatimentInZone :: Batiment -> Etat -> Bool
 isBatimentInZone batiment etat@(Etat {ville = ville}) =
   let zones = getZones ville
@@ -124,6 +126,7 @@ isBatimentInZone batiment etat@(Etat {ville = ville}) =
         False
         (Map.elems zones)
 
+-- vérifie si un bâtiment est dans une zone
 isBatimentInZone' :: Forme -> Batiment -> Bool
 isBatimentInZone' forme batiment = all (\coord -> appartient coord forme) (getCoords (getFormeBatiment batiment))
 
@@ -135,9 +138,11 @@ getBatimentCoord batiment = case batiment of
   Epicerie _ coord _ _ -> coord
   Commissariat _ coord -> coord
 
+-- invariant pour les bâtiments
 prop_inv_Batiment :: Etat -> Bool
 prop_inv_Batiment etat = prop_carte_coords_valid_Ville etat && prop_carteCoordBat_inv etat
 
+-- la forme d'un bâtiment
 getFormeBatiment :: Batiment -> Forme
 getFormeBatiment (Cabane forme _ _ _) = forme
 getFormeBatiment (Atelier forme _ _ _) = forme
@@ -161,6 +166,7 @@ getBatimentCoordFromBatId batId etat@(Etat {ville = ville}) =
         Just batiment -> Just (getBatimentCoord batiment)
         Nothing -> Nothing
 
+-- on testait
 getBatimentCoordMaybe :: Maybe Batiment -> Maybe Coord
 getBatimentCoordMaybe (Just batiment) = Just (getBatimentCoord batiment)
 getBatimentCoordMaybe Nothing = Nothing
@@ -171,3 +177,11 @@ removeBatiment batiment etat@(Etat {ville = ville}) =
   let batiments = getBatiments ville
       updatedBatiments = Map.delete batiment batiments
    in etat {ville = ville {viBat = updatedBatiments}}
+
+
+-- precondition: il y a des bâtiments dans la ville
+prop_pre_removeBatiment :: Etat -> Bool
+prop_pre_removeBatiment etat@(Etat {ville = ville}) =
+  let batiments = getBatiments ville
+   in not (Map.null batiments)
+

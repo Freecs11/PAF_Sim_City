@@ -1,7 +1,5 @@
 module State where
 
--- state of the game (citizens, buildings, zones, etc.)
--- we'll serve for simulation too
 
 import AStarPathfinding
 import Batiments
@@ -19,7 +17,7 @@ import Formes
 import GameData
 import GameData (CitId (CitId))
 
--- Initialize game state with one building (TESTING)
+-- initialize l'état du jeu avec un certain nombre de coins 
 initialiseStateWithBuilding :: Int -> Etat
 initialiseStateWithBuilding coins =
   Etat
@@ -37,34 +35,26 @@ initialiseStateWithBuilding coins =
       world = World {worldOffset = C 0 0},
       routeDirection = Horizontal,
       selectionStart = Nothing,
-      pathCache = Map.empty, -- Initialize the path cache
-      pathfindingQueue = [] -- Initialize the pathfinding queue
+      pathCache = Map.empty, -- le cache pour les paths 
+      pathfindingQueue = [] 
     }
 
+-- getter du la sélection ( ce que le joueur a sélectionné )
 getSelectedBuilding :: Etat -> Selection
 getSelectedBuilding (Etat {selection = selection}) = selection
 
+-- getter ( le time actuel )
 getTime :: Etat -> Int
 getTime (Etat {currentTime = time}) = time
+
 
 getTimeMonad :: State Etat Int
 getTimeMonad = do
   state <- get
   return $ currentTime state
 
--- menu :: IO (Map.Map String (Int, Int, Int))
--- menu = return $ Map.fromList [("Cabane", (100, 500, 80)),
---                               ("Epicerie", (200, 500, 95)),
---                               ("Police", (300, 500, 110)),
---                               ("Commissariat", (400, 500, 125)),
---                               ("Railway", (100, 500, 140)),
---                               ("ZoneRoute", (100, 500, 155))
---                               ("ZoneR",  (10, 500, 170)),
---                               ("ZoneI",  (10, 500, 185)),
---                               ("ZoneC",  (10, 500, 200)),
---                               ("ZoneA",  (10, 500, 215)),
---                               ("ZoneE",  (10, 500, 230))
---                               ]
+
+-- update la sélection
 updateSelectedBuilding :: String -> State Etat ()
 updateSelectedBuilding buildingType = modify $ \state ->
   case buildingType of
@@ -83,7 +73,7 @@ updateSelectedBuilding buildingType = modify $ \state ->
 -- On va utiliser une fonction pour ajouter un évenement à un temps donné
 -- Ex : scheduleEvent (getCurrentTime + 1000) (Move (getHomeCoord citoyen) citoyenId) etat
 -- va ajouter un évenement pour déplacer le citoyen à sa maison dans 1000 unités de temps
--- puisque la boucle de jeu va incrémenter le temps de 1 à chaque tour de boucle , 1 unité de temps = 1 tour de boucle = 1 ms ( à peu près je pense )
+-- puisque la boucle de jeu va incrémenter le temps de 1 à chaque tour de boucle 
 -- Function to add an event at a specified time
 scheduleEvent :: Int -> Event -> State Etat ()
 scheduleEvent time event = modify $ \state ->
@@ -119,6 +109,7 @@ processEvent event = case event of
   PlaceRoute coord -> placeRoute coord
   _ -> return ()
 
+-- utilisé pour des tests : on avait testé la mise en place d'une route après un certain temps
 placeRoute :: Coord -> State Etat ()
 placeRoute coord = modify $ \state ->
   let newZoneRoute = GameData.Route (GameData.Rectangle coord 120 20)
@@ -127,7 +118,7 @@ placeRoute coord = modify $ \state ->
 
 -- fonction pour géré la taxe sur les citoyens
 -- elle collecte une taxe sur chaque citoyen de la ville et l'ajoute à la caisse de la ville ( les coins du joueur)
--- et elle planifie un autre événement pour collecter la taxe à nouveau dans 10000000 unités de temps ( TODO : à mettre le temps en variable globale ou autres )
+-- et elle planifie un autre événement pour collecter la taxe à nouveau dans 3000 unités de temps 
 taxRetreival :: Int -> State Etat ()
 taxRetreival amount = do
   state <- get
@@ -145,36 +136,9 @@ taxRetreival amount = do
   put newState
   scheduleEvent (currentTime newState + 3000) (TaxRetreival amount)
 
--- moveCitizen :: Coord -> CitId -> State Etat ()
--- moveCitizen newCoord citId = do
---   state <- St.get
---   let citizen = viCit (ville state) Map.! citId -- Map.! returns an error if the key doesn't exist
---   let start = case getCoordCitoyen citId state of
---         Just c -> c
---         Nothing -> newCoord
---   let path = aStar start newCoord state
---   case path of
---     Just (_, p) ->
---       let testPath = [(C 100 100), (C 100 200), (C 100 300), (C 100 400), (C 100 500), (C 100 600), (C 100 700), (C 100 800), (C 100 900), (C 100 1000)]
---       -- trace to display the path
---       in
---       scheduleEvent ((currentTime state) + 300) (FollowPath p citId)
---     Nothing -> return () -- No path found, do nothing
-
--- getClosestRouteToCitoyen :: Maybe Coord -> Etat -> Maybe Coord
--- getClosestRouteToCitoyen Nothing _ = Nothing
--- getClosestRouteToCitoyen (Just coord) state =
---   let routes = Map.elems $ Map.filter isRoute (viZones $ ville state)
---       closestRoute = foldr (\route acc ->
---                               let routeCoord = getZoneCoord route
---                                   accCoord = fromMaybe coord acc
---                               in if mdistance coord routeCoord < mdistance coord accCoord
---                                  then Just routeCoord
---                                  else acc)
---                            Nothing
---                            routes
---   in closestRoute
-
+-- événement pour déplacer un citoyen à une nouvelle coordonnée 
+-- elle utilise le pathfinfingRequest pour avoir la coordonnée de la nouvelle destination
+-- et appel le A*pathfinding pour trouvé 
 moveCitizen :: PathfindingRequest -> State Etat ()
 moveCitizen (PathfindingRequest citId newCoord) = do
   state <- St.get
@@ -185,11 +149,10 @@ moveCitizen (PathfindingRequest citId newCoord) = do
   path <- aStar start nd
   case path of
     Just (_, p) -> do
-      -- Print the path for debugging
       scheduleEvent ((currentTime state) + 300) (FollowPath p citId)
-    Nothing -> return () -- No path found, do nothing
+    Nothing -> return () 
 
--- Add a function to enqueue pathfinding requests
+-- ajoute une requête de pathfinding à la queue
 enqueuePathfindingRequest :: CitId -> Coord -> State Etat ()
 enqueuePathfindingRequest citId newCoord = do
   state <- St.get
@@ -197,7 +160,7 @@ enqueuePathfindingRequest citId newCoord = do
   let newQueue = queue ++ [PathfindingRequest citId newCoord]
   put state {pathfindingQueue = newQueue}
 
--- Process a fixed number of pathfinding requests per tick
+-- precess un nombre fixe de requêtes de pathfinding par tick
 processPathfindingQueue :: Int -> State Etat ()
 processPathfindingQueue batchSize = do
   state <- St.get
@@ -206,6 +169,9 @@ processPathfindingQueue batchSize = do
   mapM_ moveCitizen toProcess
   put state {pathfindingQueue = remainingQueue}
 
+-- fonction qui déclanche un événement pour déplacer un citoyen à sa maison 
+-- elle décrémente la fatigue et la faim du citoyen et l'ajoute à la caisse de la ville
+-- puis elle planifie un autre événement pour déplacer le citoyen à son lieu de travail
 goHome :: CitId -> State Etat ()
 goHome citId = do
   state <- get
@@ -222,6 +188,9 @@ goHome citId = do
           scheduleEvent ((currentTime state) + 500) (GoWork citId)
         Nothing -> put state
 
+-- fonction pour déclanché un événement pour déplacer un citoyen à son lieu de travail
+-- elle décrémente la fatigue du citoyen et l'ajoute à la caisse de la ville
+-- puis elle planifie un autre événement pour faire du shopping
 goShopping :: CitId -> State Etat ()
 goShopping citId = do
   state <- get
@@ -241,6 +210,9 @@ goShopping citId = do
           scheduleEvent ((currentTime state) + 500) (GoHome citId)
         Nothing -> put state
 
+
+-- fonction pour déclanché un événement pour déplacer un citoyen à son lieu de travail
+-- elle incrémente l'argent du citoyen et l'ajoute à la caisse de la ville
 goWork :: CitId -> State Etat ()
 goWork citId = do
   state <- get
@@ -260,6 +232,8 @@ goWork citId = do
           scheduleEvent ((currentTime state) + 1500) (GoShopping citId)
         Nothing -> put state
 
+--  fonction pour déclanché un événement pour mettre à jour les citoyens selon leur argent
+-- si un citoyen a moins de 50 coins, on lui ajoute 100 coins et on planifie un autre événement pour le faire travailler
 updateCitizenMoney :: CitId -> State Etat ()
 updateCitizenMoney citId = do
   state <- get
@@ -276,6 +250,7 @@ updateCitizenMoney citId = do
         else do
           put state
 
+-- idem pour la faim 
 updateCitizenHunger :: CitId -> State Etat ()
 updateCitizenHunger citId = do
   state <- get
@@ -292,6 +267,7 @@ updateCitizenHunger citId = do
         else do
           put state
 
+-- idem pour la fatigue
 updateCitizenFatigue :: CitId -> State Etat ()
 updateCitizenFatigue citId = do
   state <- get
@@ -308,6 +284,10 @@ updateCitizenFatigue citId = do
         else do
           put state
 
+-- fonction pour mettre à jour les citoyens
+-- elle regarde si ils sont à leur maison, travail ou magasin et les met à jour en conséquence
+-- si il a la même coordonnée que sa maison, on met à jour son état à Dormir et en shedule un événement pour le faire travailler dans 800 unités de temps
+-- idem pour le travail et les courses
 updateCitizens :: State Etat ()
 updateCitizens = do
   state <- get
@@ -360,18 +340,17 @@ movingCitizen newCoord citId = modify $ \state ->
       newVille = (ville state) {viCit = Map.insert citId newCitizen (viCit (ville state))}
    in state {ville = newVille}
 
--- Helper function to update citizen's coordinates
 updateCitizenCoord :: Coord -> Citoyen -> Citoyen
 updateCitizenCoord newCoord (Immigrant _ stats occ) = Immigrant newCoord stats occ
 updateCitizenCoord newCoord (Habitant _ stats b occ) = Habitant newCoord stats b occ
 updateCitizenCoord newCoord (Emigrant _ occ) = Emigrant newCoord occ
 
+-- fonction pour mettre à jour les citoyens: on met à jour leur coordonnée de maison, travail et magasin ..
 assignBuildingstoCitizens :: State Etat ()
 assignBuildingstoCitizens = do
   state <- get
   let citoyens = getCitoyens (ville state) -- Map CitId Citoyen
   let batiments = getBatiments (ville state) -- Map BatId Batiment
-
   -- Get work and shopping buildings with available slots
   let workBuildings =
         Map.filter
@@ -387,7 +366,6 @@ assignBuildingstoCitizens = do
               _ -> False
           )
           batiments
-
   let habitants =
         Map.filter
           ( \cit -> case cit of
@@ -396,10 +374,8 @@ assignBuildingstoCitizens = do
           )
           citoyens
   let habitantIds = Map.keys habitants
-
   -- Assign work to Habitants (if they don't have one already)
   let habitantWorkAssignments = assignCitizensToBuildings habitantIds workBuildings
-
   -- Update citizens with work assignments
   let newCitoyensWithWork =
         foldr
@@ -410,7 +386,6 @@ assignBuildingstoCitizens = do
           )
           citoyens
           habitantWorkAssignments
-
   -- Re-filter citizens to update shopping assignments
   let habitants' =
         Map.filter
@@ -420,10 +395,8 @@ assignBuildingstoCitizens = do
           )
           newCitoyensWithWork
   let habitantIds' = Map.keys habitants'
-
   -- Assign shopping destinations to Habitants (if they don't have one already)
   let habitantShoppingAssignments = assignCitizensToBuildings habitantIds' shoppingBuildings
-
   -- Update citizens with shopping assignments
   let newCitoyensWithShopping =
         foldr
@@ -435,9 +408,9 @@ assignBuildingstoCitizens = do
           newCitoyensWithWork
           habitantShoppingAssignments
 
-  put $ state {ville = (ville state) {viCit = newCitoyensWithShopping}}
+  put $ state {ville = (ville state) {viCit = newCitoyensWithShopping}} -- on màj le state avec les nouveaux citoyens mis à jour
 
--- Assign citizens to buildings based on availability
+-- met à jour les citoyens avec les nouveaux batiments
 assignCitizensToBuildings :: [CitId] -> Map BatId Batiment -> [(CitId, BatId)]
 assignCitizensToBuildings [] _ = []
 assignCitizensToBuildings _ buildings | Map.null buildings = []
@@ -447,20 +420,20 @@ assignCitizensToBuildings (citId : citIds) buildings =
       (citId, batId) : assignCitizensToBuildings citIds updatedBuildings
     Nothing -> []
 
--- Find an available building and update its capacity
+-- trouve un batiment disponible pour un citoyen
 findAvailableBuilding :: Map BatId Batiment -> Maybe (BatId, Map BatId Batiment)
 findAvailableBuilding buildings =
   case Map.toList $ Map.filter hasCapacity buildings of
     ((batId, batiment) : _) -> Just (batId, Map.adjust decreaseCapacity batId buildings)
     _ -> Nothing
 
--- Check if a building has capacity for more citizens
+-- check la capicité d'un batiment et retourne True si il a une capacité > 0 ou False sinon
 hasCapacity :: Batiment -> Bool
 hasCapacity (Atelier _ _ maxCit _) = maxCit > 0
 hasCapacity (Epicerie _ _ maxCit _) = maxCit > 0
 hasCapacity _ = False
 
--- Decrease the capacity of a building
+-- décrémente la capacité d'un batiment de 1
 decreaseCapacity :: Batiment -> Batiment
 decreaseCapacity (Atelier d coord maxCit ctz) = Atelier d coord (maxCit - 1) ctz
 decreaseCapacity (Epicerie d coord maxCit ctz) = Epicerie d coord (maxCit - 1) ctz

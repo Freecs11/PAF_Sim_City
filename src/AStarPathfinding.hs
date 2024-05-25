@@ -89,3 +89,4 @@ aStar start goal = do
           modify (\s -> s { pathCache = Map.insert (start, goal) p (pathCache s) })
           return (Just p)
         Nothing -> return Nothing
+

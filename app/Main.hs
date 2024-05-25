@@ -39,29 +39,29 @@ import qualified TextureMap as TM
 import Zone
 import System.Random (randomRs, mkStdGen)
 
+-- Constants
 windowsWidth :: CInt
 windowsWidth = 1280
-
 windowsHeight :: CInt
 windowsHeight = 680
-
 tailleBloc :: CInt
 tailleBloc = 50
-
 tailleBlocI :: Int
 tailleBlocI = 10
 
+-- forme de la route horizontale ( 40 de hauteur)
 routeFormeHoriz :: Coord -> Int -> Forme
-routeFormeHoriz coord l = GameData.Rectangle coord l 20
+routeFormeHoriz coord l = GameData.Rectangle coord l 40
 
+-- forme de la route verticale ( 40 de largeur)
 routeFormeVert :: Coord -> Int -> Forme
-routeFormeVert coord l = GameData.Rectangle coord 20 l
+routeFormeVert coord l = GameData.Rectangle coord 40 l
 
+-- forme rectangulaire
 rectangularZone :: Coord -> Int -> Int -> Forme
 rectangularZone coord w h = GameData.Rectangle coord w h
 
--- TO BE MODIFIED --------------------------------------------------------------
-
+-- background loader
 loadBackground :: Renderer -> FilePath -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
 loadBackground rdr path tmap smap = do
   tmap' <- TM.loadTexture rdr path (TextureId "grass") tmap
@@ -86,6 +86,7 @@ loadBuildings rdr ((tid, path) : xs) tmap smap = do
   let smap' = SM.addSprite (SpriteId $ show tid) sprite smap
   loadBuildings rdr xs tmap' smap'
 
+-- | Load background color
 loadBackgroundColor :: Renderer -> V4 Word8 -> IO ()
 loadBackgroundColor renderer color = do
   rendererDrawColor renderer $= color
@@ -103,6 +104,7 @@ menu =
         ("Commissariat", (125, 1100, 125))
       ]
 
+-- render les items du menu ( batiments) avec leur cout
 renderMenuItems :: Renderer -> Font.Font -> Map.Map String (Int, Int, Int) -> IO ()
 renderMenuItems renderer font menuItems = do
   -- on render chaque item du menu
@@ -113,6 +115,7 @@ renderMenuItems renderer font menuItems = do
     menuItems
   return ()
 
+-- contient les zones ( Route, résidentiel, industriel, commercial, administrative, eau)
 zonesMenu :: IO (Map.Map String (Int, Int))
 zonesMenu =
   return $
@@ -125,6 +128,7 @@ zonesMenu =
         ("ZoneE", (1100, 295))
       ]
 
+-- on render les zones après les batiments
 renderZonesMenuItems :: Renderer -> Font.Font -> Map.Map String (Int, Int) -> IO ()
 renderZonesMenuItems renderer font menuItems = do
   -- on render chaque item du menu
@@ -144,21 +148,24 @@ getTextureId :: Sprite -> TextureId
 getTextureId sprite = case S.currentImage sprite of
   S.Image tid _ -> tid
 
--- Adjust for world offset
+-- Adjust for world offset on peut se déplacer dans le monde avec ( Q S D Z)
 applyOffset :: Coord -> Coord -> Coord
 applyOffset (C x y) (C dx dy) = C (x + dx) (y + dy)
 
+-- renders the background map with the world offset
 renderBackgroundMap :: Renderer -> TextureMap -> SpriteMap -> Coord -> IO ()
 renderBackgroundMap renderer tmap smap offset = do
   let sprite = SM.fetchSprite (SpriteId "grass") smap
   let (x, y) = getXY offset
   S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral (x - 4000)) (fromIntegral (y - 4000)))
 
+-- render les batiments avec l'offset du monde
 renderBuildings :: Renderer -> TextureMap -> SpriteMap -> Ville -> Coord -> IO ()
 renderBuildings renderer tmap smap ville offset = do
   let buildings = Map.elems $ viBat ville
   mapM_ (renderBuilding renderer tmap smap offset) buildings
 
+-- render un batiment avec l'offset du monde
 renderBuilding :: Renderer -> TextureMap -> SpriteMap -> Coord -> Batiment -> IO ()
 renderBuilding renderer tmap smap offset building = do
   let (coord, spriteId) = case building of
@@ -170,6 +177,7 @@ renderBuilding renderer tmap smap offset building = do
   let (x, y) = getXY $ applyOffset coord offset
   S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral x) (fromIntegral y))
 
+-- load un element
 loadElement :: Renderer -> FilePath -> String -> TextureMap -> SpriteMap -> IO (TextureMap, SpriteMap)
 loadElement rdr path id tmap smap = do
   tmap' <- TM.loadTexture rdr path (TextureId id) tmap
@@ -202,10 +210,11 @@ main = do
   (tmap', smap') <- foldM (\(t, s) (id, path) -> loadElement renderer path id t s) (tmap'', smap'') buildings
 
   let startCoins = 3000
-  let taxesCitizens = 100
+  let taxesCitizens = 100 -- taxes prélevées sur les citoyens (tous les 3000 unités de temps)
   -- initialisation de l'état du jeu , batiment selectionné par défaut est les routes
   let gameState0 = State.initialiseStateWithBuilding startCoins
 
+  -- on schedule un évenement pour prélever des taxes sur les citoyens tous les 1000000 unités de temps
   let retrEvent = GameData.TaxRetreival taxesCitizens
   -- let placeRout = GameData.PlaceRoute (C 107 255)
   -- let cit1GowORK = GameData.GoWork (CitId (show 1))
@@ -238,30 +247,38 @@ main = do
   putStrLn "Exiting..."
 
 -- Game loop now processes IO and state updates separately
--- Game loop now processes IO and state updates separately
 gameLoop :: (RealFrac a, Show a) => a -> Renderer -> TextureMap -> SpriteMap -> Keyboard -> Etat -> MouseState -> Font.Font -> Map.Map String (Int, Int, Int) -> Map.Map String (Int, Int) -> IO ()
 gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMenuItems = do
   startTime <- time
-  events <- pollEvents
-  let kbd' = K.handleEvents events kbd
+  events <- pollEvents -- tous les événements
+  let kbd' = K.handleEvents events kbd -- Update keyboard state based on events
   let mouse' = Ms.handleMouseEvents events mouse -- Update mouse state based on events
-  let gameStateW = moveWorld kbd' gameState
+  let gameStateW = moveWorld kbd' gameState -- on peut se déplacer dans le monde avec ( Q S D Z)
 
   clear renderer
 
+  -- on récupère le batiment selectionné
   let selectedBuilding = case State.getSelectedBuilding gameState of
         BuildingType building -> building
         ZoneType zone -> zone
         None -> "None"
+
   --- display background
   -- S.displaySprite renderer tmap (SM.fetchSprite (SpriteId "grass") smap)
   renderBackgroundMap renderer tmap smap (worldOffset $ world gameStateW)
   -- Display the selected building on the screen top left
   -- S.displayText renderer font ("Selected building: " <> pack selectedBuilding) (V2 3 5) (V4 255 255 255 255)
 
+  if (State.getTime gameStateW)  < 5000
+    then
+      S.displayText renderer font "Press Q, S, D, Z to move the world" (V2 3 650) (V4 255 255 255 255)
+    else
+      return ()
+
   -- display player coins on the screen top left
   S.displayText renderer font ("Coins: " <> pack (show $ coins gameStateW)) (V2 3 5) (V4 255 255 255 255)
 
+  -- number of citizens
   let sizeCitizens = Map.size $ viCit $ ville gameStateW
 
   -- display number of citizens on the screen top left
@@ -270,18 +287,20 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
   -- display current time on the screen bottom left
   S.displayText renderer font ("Time: " <> pack (show $ currentTime gameStateW)) (V2 3 50) (V4 255 255 255 255)
 
-  -- print first citizen
+  -- print first citizen for debugging
   printFirstCitizen gameStateW
 
   -- let isKeyPressed = K.keypressed KeycodeZ kbd'
   -- when isKeyPressed $ putStrLn "Z key pressed"
+
   -- Toggle route direction when key R is pressed
   let gameStateW' = if K.keypressed KeycodeR kbd' then toggleRouteDirection gameStateW else gameStateW
 
+  -- Display route direction when route building is selected
   if selectedBuilding == "ZoneRoute"
     then do
       let routeDir = routeDirection gameStateW'
-      S.displayText renderer font ("Route direction: " <> pack (show routeDir)) (V2 3 20) (V4 255 255 255 255)
+      S.displayText renderer font ("Route direction: " <> pack (show routeDir) <> "Click on R to switch") (V2 3 20) (V4 255 255 255 255)
     else return ()
 
   -- Render buildings with world offset
@@ -308,19 +327,18 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
   (updatedMenuItems, currentSelectedBuilding) <- updateMenuItems menuItems zonesMenuItems selectedBuilding mouse' events
   -- print all existing zones in the game state
   -- putStrLn $ show $ viZones $ ville gameState
+  -- Create a structure if needed ( if mouse button is pressed and then released --> drag  and if a structure is selected)
   gameStateStr <- createStructureIfNeeded currentSelectedBuilding mouse' events gameStateW' updatedMenuItems
-  -- Check if a building needs to be created
+  -- Create a building if needed
   gameState'' <- createBuildingIfNeeded currentSelectedBuilding mouse' events gameStateStr updatedMenuItems
 
-  -- Spawn citizens
+  -- Spawn citizens and assign them to homes (we spawn )
   gameStateCitizens <- spawnCitizens gameState''
 
   -- let updateEvent = GameData.UpdateCitizens
 
-  -- scheduleEvent
-  -- let gameStateWithEvent = execState (State.scheduleEvent (State.getTime gameStateW + 10) updateEvent) gameStateCitizens
 
-   -- Process a fixed number of pathfinding requests per tick
+  -- Process a fixed max number of pathfinding requests per tick
   let batchSize = 10 -- Adjust the batch size as needed
   let gameStateProcessed = execState (State.processPathfindingQueue batchSize) gameStateCitizens
 
@@ -335,11 +353,13 @@ gameLoop frameRate renderer tmap smap kbd gameState mouse font menuItems zonesMe
           gameStateProcessed
   unless (K.keypressed KeycodeEscape kbd') (gameLoop frameRate renderer tmap smap kbd' gameState' {currentTime = (currentTime gameState') + 1} mouse' font updatedMenuItems zonesMenuItems)
 
+-- change the route direction when the key R is pressed
 toggleRouteDirection :: Etat -> Etat
 toggleRouteDirection etat =
   let direction = routeDirection etat
    in etat {routeDirection = if direction == Horizontal then Vertical else Horizontal}
 
+-- create building with the given cost when the cost is available and also when we click on the screen 
 createBuildingIfNeeded :: String -> MouseState -> [Event] -> Etat -> Map.Map String (Int, Int, Int) -> IO Etat
 createBuildingIfNeeded selectedBuilding mouseEvent events gameState menuItems =
   if Ms.mouseButtonPressed mouseEvent events
@@ -353,9 +373,11 @@ createBuildingIfNeeded selectedBuilding mouseEvent events gameState menuItems =
         else return gameState
     else return gameState
 
+-- we had to negate the offset because the mouse position is relative to the window and not the world
 negateCoord :: Coord -> Coord
 negateCoord (C x y) = C (-x) (-y)
 
+-- create a building with the given cost
 createBuilding :: String -> Coord -> State Etat ()
 createBuilding "Cabane" coord = do
   etat <- St.get
@@ -392,6 +414,7 @@ createBuilding "Commissariat" coord = do
     else return ()
 createBuilding _ _ = return ()
 
+-- used to update the selected menu item when the mouse is clicked
 updateMenuItems :: Map.Map String (Int, Int, Int) -> Map.Map String (Int, Int) -> String -> MouseState -> [Event] -> IO (Map.Map String (Int, Int, Int), String)
 updateMenuItems menuItems zonesMenuItems selectedBuilding mouseEvent events =
   if Ms.mouseButtonPressed mouseEvent events
@@ -416,7 +439,7 @@ updateMenuItems menuItems zonesMenuItems selectedBuilding mouseEvent events =
             else return (menuItems, selectedBuilding) -- No item was clicked
     else return (menuItems, selectedBuilding) -- No mouse button was pressed
 
--- Move the whole world when arrow keys are pressed
+-- Move the whole world when the keys Q, S, D, Z are pressed
 moveWorld :: Keyboard -> Etat -> Etat
 moveWorld kbd etat =
   let dx = if K.keypressed KeycodeD kbd then 10 else if K.keypressed KeycodeQ kbd then -10 else 0
@@ -429,14 +452,16 @@ moveWorld kbd etat =
 isOutsideMenu :: Coord -> Bool
 isOutsideMenu (C x y) = x < 1100
 
+-- method to render the zones 
 renderZones :: Renderer -> Ville -> Coord -> IO ()
 renderZones renderer ville offset = do
   let zones = Map.elems $ viZones ville
   mapM_ (renderZone renderer offset) zones
 
+-- method to render a single zone
 renderZone :: Renderer -> Coord -> Zone -> IO ()
 renderZone renderer offset (Route forme) = do
-  -- for route , draw blue rectangle
+  -- for route ,we just draw blue rectangle
   let (x, y) = getXY $ applyOffset (zoneCoord (Route forme)) offset
   let (w, h) = getWH (zoneForme (Route forme))
   SDL.rendererDrawColor renderer $= V4 0 0 255 255
@@ -448,6 +473,7 @@ renderZone renderer offset (Eau forme) = do
   SDL.rendererDrawColor renderer $= V4 0 255 255 255
   SDL.fillRect renderer (Just (SDL.Rectangle (P (V2 (fromIntegral x) (fromIntegral y))) (V2 (fromIntegral w) (fromIntegral h))))
 renderZone renderer offset zone = do
+  -- for other zones, draw a border around the zone
   let (x, y) = getXY $ applyOffset (zoneCoord zone) offset
   let (w, h) = getWH (zoneForme zone)
   -- Draw the top border
@@ -463,7 +489,7 @@ renderZone renderer offset zone = do
   -- Draw the right border
   SDL.drawLine renderer (P (V2 (fromIntegral (x + w)) (fromIntegral y))) (P (V2 (fromIntegral (x + w)) (fromIntegral (y + h))))
 
--- Define colors for different zone types
+-- colors for different zone types
 zoneBorderColor :: Zone -> V4 Word8
 zoneBorderColor (ZR _ _) = V4 255 0 0 255 -- red for residential
 zoneBorderColor (ZI _ _) = V4 0 255 0 255 -- green for industrial
@@ -472,29 +498,11 @@ zoneBorderColor (Eau _) = V4 0 255 255 255 -- cyan for water
 zoneBorderColor (Route _) = V4 255 255 0 255 -- yellow for routes
 zoneBorderColor (Admin _ _) = V4 255 0 255 255 -- magenta for administrative
 
-getWH :: Forme -> (Int, Int)
-getWH (GameData.Rectangle _ w h) = (w, h)
-getWH (HSegment _ l) = (l, tailleBlocI)
-getWH (VSegment _ l) = (tailleBlocI, l)
 
-zoneCoord :: Zone -> Coord
-zoneCoord (ZR forme _) = getFormeCoord forme
-zoneCoord (ZI forme _) = getFormeCoord forme
-zoneCoord (ZC forme _) = getFormeCoord forme
-zoneCoord (Eau forme) = getFormeCoord forme
-zoneCoord (Route forme) = getFormeCoord forme
-zoneCoord (Admin forme _) = getFormeCoord forme
-
-zoneForme :: Zone -> Forme
-zoneForme (ZR forme _) = forme
-zoneForme (ZI forme _) = forme
-zoneForme (ZC forme _) = forme
-zoneForme (Eau forme) = forme
-zoneForme (Route forme) = forme
-zoneForme (Admin forme _) = forme
-
+-- we use a custion type to represent the different types of zones to facilitate the creation of zones
 data ZoneType = ZTR | ZTI | ZTC | ZTA | ZTE deriving (Show, Eq)
 
+-- create a zone with click and drag and with respect to the world offset
 createStructureIfNeeded :: String -> MouseState -> [Event] -> Etat -> Map.Map String (Int, Int, Int) -> IO Etat
 createStructureIfNeeded selectedStructure mouseEvent events gameState menuItems = do
   let (x, y) = Ms.getMousePosition mouseEvent
@@ -535,6 +543,7 @@ createStructure "ZoneA" coord mouseEvent events = handleZoneCreation ZTA coord m
 createStructure "ZoneE" coord mouseEvent events = handleZoneCreation ZTE coord mouseEvent events
 createStructure _ _ _ _ = return ()
 
+-- handle the creation of a zone ( we check for collision with other zones and the cost of the zone) but collision is kinda redundant as it's already in the createZone function
 handleZoneCreation :: ZoneType -> Coord -> MouseState -> [Event] -> State Etat ()
 handleZoneCreation zoneType coord mouseEvent events = do
   etat <- St.get
@@ -564,7 +573,7 @@ spawnCitizens etat = do
   let etat' = execState (spawnCitizensForHomes homes  randomDelays 0) etat
   return etat'
 
-
+-- Generate random delays for citizens to go to work
 generateRandomDelays :: Int -> [Int]
 generateRandomDelays seed = randomRs (1, 1000) (mkStdGen seed)
 
@@ -584,8 +593,6 @@ spawnCitizensForHomes ((batId, batiment) : xs) delays timedelay = do
           put $ updateBatiment updatedBatiment batId finalEtat
           spawnCitizensForHomes xs remainingDelays (timedelay + 100)
     _ -> spawnCitizensForHomes xs delays timedelay
-
-
 
 -- Spawns citizens for a home
 spawnCitizensForHome :: BatId -> Coord -> Int -> [CitId] -> Etat -> ([CitId], Etat)
@@ -630,12 +637,13 @@ renderCitizens renderer tmap smap ville offset = do
   let batiments = viBat ville
   mapM_ (renderCitizen renderer tmap smap offset batiments) citoyens
 
+-- render a single citizen
 renderCitizen :: Renderer -> TextureMap -> SpriteMap -> Coord -> Map.Map BatId Batiment -> Citoyen -> IO ()
 renderCitizen renderer tmap smap offset batiments citoyen = do
   -- unless (isCitizenAtBuilding citoyen batiments) $ do
   let (coord, spriteId) = case citoyen of
-        Habitant coord _ _ _ -> (coord, SpriteId "perso") -- Use a default sprite for citizen
-        _ -> (C 0 0, SpriteId "perso")
+        Habitant coord _ _ _ -> (coord, SpriteId "perso") 
+        _ -> (C 0 0, SpriteId "perso") -- là on a pas encore géré les autres types de citoyens.
   let sprite = SM.fetchSprite spriteId smap
   let (x, y) = getXY $ applyOffset coord offset
   S.displaySprite renderer tmap (S.moveTo sprite (fromIntegral x) (fromIntegral y))
